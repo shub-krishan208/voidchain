@@ -3,5 +3,6 @@ mds/
 test/
 
 build/
+.cache/
 vcpkg/
 vcpkg_installed/

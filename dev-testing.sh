@@ -1,14 +1,15 @@
 #!/bin/bash
 
-if ! [command -v entr &> /dev/null]; then
+if ! command -v entr &> /dev/null; then
     echo "Please install 'entr' to use watch mode."
     exit 1
 fi
     
 
-if [! -d "build" ]; then
-    echo "No "build" folder found. Creating one ..."
-    cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
+if [ ! -d "build" ]; then
+    echo "No build folder found. Creating one ..."
+    cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    ln -s ./build/compile-commands.json .
 fi
 
 echo "Starting Watch mode..."

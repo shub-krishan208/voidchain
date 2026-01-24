@@ -8,7 +8,8 @@ find_package(OpenSSL REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 
 
-add_executable(voidchain src/main.cpp)
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+add_executable(voidchain ${SOURCES})
 
 target_link_libraries(voidchain PRIVATE
     nlohmann_json::nlohmann_json
