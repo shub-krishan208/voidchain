@@ -1,3 +1,18 @@
 # Voidchain
 
 A blockchain project is under construction 🏗 🚧
+
+## Locally Running
+
+Locally Install vcpkg first, for project root (also cmake >= 3.2)
+
+```bash
+#imediately after cloning the repo
+cd voidchain
+git clone https://github.com/microsoft/vcpkg.git
+./vcpkg/bootstrap-vcpkg.sh
+
+# The run the script
+chmod +x ./run.sh
+./run.sh
+```

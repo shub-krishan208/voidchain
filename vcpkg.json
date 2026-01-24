@@ -1,0 +1,10 @@
+{
+    "name": "void-chain",
+    "version-string": "0.0.0",
+    "dependencies": [
+        "nlohmann-json",
+        "crow",
+        "openssl",
+        "gtest"
+    ]
+}

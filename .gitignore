@@ -1,2 +1,7 @@
-# Dev notes
+# Dev
 mds/
+test/
+
+build/
+vcpkg/
+vcpkg_installed/
