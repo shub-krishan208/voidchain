@@ -11,14 +11,20 @@ void Blockchain::addBlock(const std::string data) {
     Block newTxn = Block::mineBlock(getLatestBlock(), data);
     chain.push_back(newTxn);
 }
-
-Block Blockchain::getLatestBlock() {
+const Block& Blockchain::getLatestBlock() {
     return chain.back();
 }
 
 bool Blockchain::isValidBlockchain(const std::vector<Block>& newchain) {
     // check if the first block is valid genesis block
-    if (newchain.empty() || newchain[0].getHash() != Block::genesis().getHash()) {
+    const Block& genesis = Block::genesis();
+    const Block& fblock = newchain[0];
+    if (newchain.empty() || 
+        fblock.getHash() != genesis.getHash() ||
+        fblock.getLastHash() != genesis.getLastHash() ||
+        fblock.getData() != genesis.getData() ||
+        fblock.getTimestamp() != genesis.getTimestamp()
+        ) {
         return false;
     }
     // singlie block chain
@@ -36,7 +42,8 @@ bool Blockchain::isValidBlockchain(const std::vector<Block>& newchain) {
 
         // verify the hash of the current block
         std::string recalculatedHash = Block::hashBlock(
-            std::to_string(currentBlock.getTimestamp()),
+            // TODO: check to_string is system independent
+            std::to_string(currentBlock.getTimestamp()), 
             currentBlock.getLastHash(),
             currentBlock.getData()
         );
@@ -49,7 +56,7 @@ bool Blockchain::isValidBlockchain(const std::vector<Block>& newchain) {
     return true;
 }
 
-void Blockchain::replaceBlockchain(std::vector<Block> newchain) {
+void Blockchain::replaceBlockchain(const std::vector<Block>& newchain) {
     if (newchain.size() <= chain.size()) {
         throw std::invalid_argument("Received chain is not longer than the current chain.");
     }
