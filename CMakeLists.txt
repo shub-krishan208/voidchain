@@ -11,6 +11,7 @@ find_package(OpenSSL REQUIRED)
 # core library to be reused in apps and subapps (tests)
 add_library(voidchain_core 
     src/block.cpp
+    src/chain.cpp
     src/utils/hashing.cpp
 )
 

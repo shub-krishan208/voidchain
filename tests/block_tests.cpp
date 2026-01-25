@@ -4,8 +4,7 @@
 TEST(BlockTest, GenesisBlock){
     Block genesis = Block::genesis();
     EXPECT_EQ(genesis.getData(), "");
-    EXPECT_EQ(genesis.getLastHash(), "------");
-    
+    EXPECT_EQ(genesis.getLastHash(), std::string(64, '0'));
 }
 
 TEST(BlockTest, MineBlock){

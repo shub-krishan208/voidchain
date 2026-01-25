@@ -1,5 +1,7 @@
 #include "./utils/TimeUtils.h"
 #include "block.h"
+#include "chain.h"
+
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -13,16 +15,22 @@ void printBlock(str title, Block b) {
             << "Data: " << b.getData() << std::endl;
 }
 
-Block RandomBlock() {
-  return Block(getCurrentTime(), "0000000000000000000lastHashExample",
-               "0000000000000000000hashExample", "Some block data");
-}
-int main() {
-  Block block = RandomBlock();
-  Block FirstBlock = Block::genesis();
-  Block newBlock = Block::mineBlock(block, "blud what's with the data!?");
+void printBlocks() {
+    Block FirstBlock = Block::genesis();
+  Block newBlock = Block::mineBlock(FirstBlock, "blud what's with the data!?");
+  Block block = Block::mineBlock(newBlock, "Another Block Data");
   printBlock("Genesis Block", FirstBlock);
-  printBlock("Block 1", block);
+  printBlock("Random Block", block);
   printBlock("Mined Block", newBlock);
+}
+
+void printChain(){
+  Chain chain;
+  printBlock("Chain initialised", chain.getLatestBlock());
+}
+
+int main() {
+  // printBlocks();
+  printChain();
   return 0;
 }

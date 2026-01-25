@@ -8,7 +8,9 @@ Block::Block(const int64_t timestamp, const std::string lastHash,
     : timestamp(timestamp), lastHash(lastHash), hash(hash), data(data) {}
 
 Block Block::genesis() {
-  return Block(getCurrentTime(), "------", "0x00000000", "");
+  std::string prevGenesisHash(64, '0');
+  auto timestamp = getCurrentTime();
+  return Block(timestamp, prevGenesisHash, Block::hashBlock(std::to_string(timestamp), prevGenesisHash, ""), "");
 }
 
 Block Block::mineBlock(Block lastBlock, std::string data) {
