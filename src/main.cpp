@@ -25,12 +25,12 @@ void printBlocks() {
 }
 
 void printChain(){
-  Chain chain;
+  Blockchain chain;
   printBlock("Chain initialised", chain.getLatestBlock());
 }
 
 int main() {
   // printBlocks();
-  printChain();
+  // printChain();
   return 0;
 }

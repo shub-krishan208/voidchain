@@ -9,8 +9,8 @@ Block::Block(const int64_t timestamp, const std::string lastHash,
 
 Block Block::genesis() {
   std::string prevGenesisHash(64, '0');
-  auto timestamp = getCurrentTime();
-  return Block(timestamp, prevGenesisHash, Block::hashBlock(std::to_string(timestamp), prevGenesisHash, ""), "");
+  const int64_t GENESIS_TIMESTAMP = 1769351684715; // Jan 24, 2026
+  return Block(GENESIS_TIMESTAMP, prevGenesisHash, Block::hashBlock(std::to_string(GENESIS_TIMESTAMP), prevGenesisHash, ""), "");
 }
 
 Block Block::mineBlock(Block lastBlock, std::string data) {
