@@ -1,20 +1,34 @@
 cmake_minimum_required(VERSION 3.20)
-
 project(VoidChain VERSION 0.0.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Crow CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
-find_package(GTest CONFIG REQUIRED)
 
+# core library to be reused in apps and subapps (tests)
+add_library(voidchain_core 
+    src/block.cpp
+    src/utils/hashing.cpp
+)
 
-file(GLOB_RECURSE SOURCES "src/*.cpp")
-add_executable(voidchain ${SOURCES})
-
-target_link_libraries(voidchain PRIVATE
+# complete core library dependencies
+target_link_libraries(voidchain_core PUBLIC
     nlohmann_json::nlohmann_json
     Crow::Crow
     OpenSSL::SSL
     OpenSSL::Crypto
-    GTest::gtest_main
 )
+
+add_executable(voidchain src/main.cpp)
+target_link_libraries(voidchain PRIVATE voidchain_core)
+
+option(BUILD_TESTING "Build Tests" ON)
+
+if(BUILD_TESTING)
+    # Enable testing
+    enable_testing()
+    add_subdirectory(tests)
+endif()

@@ -1,9 +1,18 @@
 #!/bin/bash
 
-cmake -S . -B build \
-  -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake \
-  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build
-ln -s build/compile_commands.json .
+mode="debug"
 
-./build/voidchain
+echo "Building VoidChain [DEBUG] ..."
+cmake --preset debug .
+cmake --build --preset $mode
+
+echo "Testing ..."
+ctest --preset $mode
+if [ $? -ne 0 ]; then
+  echo "Tests failed!"
+  exit 1
+  else
+  echo "All tests passed!"
+fi
+echo "Running VoidChain ..."
+./build/$mode/voidchain
