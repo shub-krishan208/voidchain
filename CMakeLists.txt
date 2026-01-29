@@ -13,6 +13,7 @@ add_library(voidchain_core
     src/block.cpp
     src/chain.cpp
     src/router.cpp
+    src/p2p_server.cpp
     src/utils/hashing.cpp
 )
 

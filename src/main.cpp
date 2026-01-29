@@ -2,6 +2,7 @@
 #include "block.h"
 #include "chain.h"
 #include "router.h"
+#include "p2p_server.h"
 
 #include <iostream>
 // #include <nlohmann/json.hpp>
@@ -35,6 +36,25 @@ void printChain() {
 int main() {
   Blockchain bc;
   crow::SimpleApp app;
+
+  P2pServer p2p;
+  CROW_WEBSOCKET_ROUTE(app, "/ws")
+        .onopen([&p2p](crow::websocket::connection& conn) {
+            p2p.onOpen(conn);
+        })
+        .onclose([&p2p](crow::websocket::connection& conn,
+                const std::string& reason,
+                uint16_t code) {
+            p2p.onClose(conn);
+        })
+        .onmessage([&p2p](crow::websocket::connection& conn,
+                          const std::string& data,
+                          bool is_binary) {
+            if (!is_binary) {
+                p2p.onMessage(conn, data);
+            }
+        });
+
 
   Router router(app, bc);
 
