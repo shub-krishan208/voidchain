@@ -1,7 +1,7 @@
 #ifndef VOID_BLOCK_H
 #define VOID_BLOCK_H
 #include <cstdint>
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 #include <string>
 
 class Block {
@@ -14,7 +14,9 @@ public:
   const std::string &getData() const { return data; };
   static Block genesis();
   static Block mineBlock(Block lastBlock, std::string data);
-  static std::string hashBlock(std::string timestamp, std::string lastHash, std::string data);
+  static std::string hashBlock(std::string timestamp, std::string lastHash,
+                               std::string data);
+
 private:
   int64_t timestamp;
   std::string lastHash;

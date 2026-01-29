@@ -12,6 +12,7 @@ find_package(OpenSSL REQUIRED)
 add_library(voidchain_core 
     src/block.cpp
     src/chain.cpp
+    src/router.cpp
     src/utils/hashing.cpp
 )
 
