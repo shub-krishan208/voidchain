@@ -3,11 +3,7 @@
     "configurePresets": [
         {
             "name": "base",
-            "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "environment": {
-                "VCPKG_ROOT": "${sourceDir}/vcpkg"
-            },
             "cacheVariables": {
                 "CMAKE_CXX_STANDARD": "20",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
