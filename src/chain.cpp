@@ -6,6 +6,7 @@ Blockchain::Blockchain() {
 }
 
 void Blockchain::addBlock(const std::string data) {
+  std::lock_guard<std::mutex> lock(chainMutex);
   Block newTxn = Block::mineBlock(getLatestBlock(), data);
   chain.push_back(newTxn);
 }
@@ -48,13 +49,17 @@ bool Blockchain::isValidBlockchain(const std::vector<Block> &newchain) {
   return true;
 }
 
-void Blockchain::replaceBlockchain(const std::vector<Block> &newchain) {
+bool Blockchain::replaceBlockchain(const std::vector<Block> &newchain) {
+  std::lock_guard<std::mutex> lock(chainMutex);
   if (newchain.size() <= chain.size()) {
     throw std::invalid_argument(
         "Received chain is not longer than the current chain.");
-  }
+  return false;
+}
   if (!isValidBlockchain(newchain)) {
     throw std::invalid_argument("Received chain is invalid.");
+  return false;
   }
   chain = newchain;
+  return true;
 }

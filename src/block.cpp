@@ -1,7 +1,4 @@
 #include "block.h"
-#include "./utils/TimeUtils.h"
-#include <cstdint>
-#include "./utils/hashing.h"
 
 Block::Block(const int64_t timestamp, const std::string lastHash,
              const std::string hash, const std::string data)
@@ -25,4 +22,21 @@ std::string Block::hashBlock(std::string timestamp, std::string lastHash, std::s
   h.add(data);
 
   return h.finish();
+}
+
+crow::json::wvalue Block::toJson() const {
+  crow::json::wvalue json;
+  json["timestamp"] = timestamp;
+  json["last_hash"] = lastHash;
+  json["hash"] = hash;
+  json["data"] = data;
+  return json;
+}
+
+Block Block::fromJson(const crow::json::rvalue &json) {
+  int64_t timestamp = json["timestamp"].i();
+  std::string lastHash = json["last_hash"].s();
+  std::string hash = json["hash"].s();
+  std::string data = json["data"].s();
+  return Block(timestamp, lastHash, hash, data);
 }

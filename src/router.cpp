@@ -21,13 +21,7 @@ void Router::registerRoutes() {
 
     int idx = 0;
     for (const auto &block : blockchain_.getChain()) {
-      crow::json::wvalue bjson;
-      bjson["timestamp"] = block.getTimestamp();
-      bjson["hash"] = block.getHash();
-      bjson["last_hash"] = block.getLastHash();
-      bjson["data"] = block.getData();
-
-      res["blocks"][idx++] = std::move(bjson);
+      res["blocks"][idx++] = block.toJson();
     }
     return res;
   });
@@ -48,16 +42,11 @@ void Router::registerRoutes() {
 
         blockchain_.addBlock(data);
         crow::json::wvalue res;
-        res["message"] = "Block added successfullt";
+        res["message"] = "Block added successfully";
         res["data"] = data;
 
-        res["new_block"] = crow::json::wvalue();
         Block new_block = blockchain_.getLatestBlock();
-
-        res["new_block"]["timestamp"] = new_block.getTimestamp();
-        res["new_block"]["lastHash"] = new_block.getLastHash();
-        res["new_block"]["hash"] = new_block.getHash();
-        res["new_block"]["data"] = new_block.getData();
+        res["new_block"] = new_block.toJson();
 
         return crow::response(200, res);
       });
