@@ -10,8 +10,8 @@ public:
     ~Wallet();
 
     EVP_PKEY* getPublicKey() const;
+    EVP_PKEY* getAddress() const;
     std::vector<unsigned char> sign(const std::string& data) const;
-    std::string getAddress() const;
 private:
     EVP_PKEY* keyPair_;
 };

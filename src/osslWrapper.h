@@ -13,5 +13,6 @@ public:
     static std::vector<unsigned char> sign(EVP_PKEY* privateKey, const std::string& data);
     static bool verify(EVP_PKEY* publicKey, const std::string& data, const std::vector<unsigned char>& signature);
     
-    static std::string publicKeyToHex(EVP_PKEY* publicKey);
+    static EVP_PKEY* extractPublicKey(const EVP_PKEY* keypair);
+    static std::string publicKeyToPEM(EVP_PKEY* publicKey);
 };

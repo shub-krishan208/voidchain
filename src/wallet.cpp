@@ -8,12 +8,12 @@ Wallet::~Wallet() {
     EVP_PKEY_free(keyPair_);
 }
 
-std::string Wallet::getAddress() const {
-    return OpenSSLWrapper::publicKeyToHex(keyPair_);
+EVP_PKEY* Wallet::getAddress() const {
+    return keyPair_;
 }
 
 EVP_PKEY* Wallet::getPublicKey() const {
-    return keyPair_;
+    return OpenSSLWrapper::extractPublicKey(keyPair_);
 }
 
 std::vector<unsigned char> Wallet::sign(const std::string& data) const {

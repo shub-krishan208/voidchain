@@ -3,6 +3,8 @@
 #include "chain.h"
 #include "router.h"
 #include "p2p_server.h"
+#include "wallet.h"
+#include "osslWrapper.h"
 
 #include <iostream>
 // #include <nlohmann/json.hpp>
@@ -33,6 +35,14 @@ void printChain() {
   printBlock("After adding first block", chain.getLatestBlock());
 }
 
+void printWallet() {
+  Wallet w;
+  auto sig = w.sign("Some data to sign");
+  std::cout<<"Wallet Address: " << w.getAddress() << std::endl
+           <<"Public Key: " << w.getPublicKey() <<std::endl
+           << "Signature verification: " << OpenSSLWrapper::verify(w.getPublicKey(), "Some data to sign", sig) <<std::endl;
+}
+
 int main() {
   Blockchain bc;
   crow::SimpleApp app;
@@ -60,7 +70,7 @@ int main() {
 
   router.registerRoutes();
   printChain();
-
+  printWallet();
   app.port(18169).multithreaded().run();
   // printBlocks();
   return 0;
