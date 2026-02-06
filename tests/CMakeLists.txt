@@ -5,6 +5,7 @@ find_package(GTest CONFIG REQUIRED)
 add_executable(run_tests
     block_tests.cpp
     chain_tests.cpp
+    wallet_tests.cpp
 )
 
 target_link_libraries(run_tests PRIVATE 
