@@ -1,27 +1,24 @@
-#include <gtest/gtest.h>
 #include "../src/wallet.h"
+#include <gtest/gtest.h>
+#include <openssl/evp.h>
 
-TEST(WalletTest, GenerateWallet) {
-    Wallet w;
-    ASSERT_NE(w.getPublicKey(), nullptr);
-    EVP_PKEY* pub = w.getPublicKey();
-    
-    EXPECT_NE(pub, nullptr);
-}
+TEST(WalletTest, WalletBasics) {
+  Wallet w;
 
-TEST(WalletTest, GetAddress) {
-    Wallet w;
-    auto address = w.getAddress();
-    EXPECT_NE(address, nullptr);
-}
+  EVP_PKEY *pub = w.getPublicKey();
+  EXPECT_NE(pub, nullptr);
 
-TEST(WalletTest, SignAndVerify) {
-    Wallet w;
-    std::string data = "Test data for signing";
-    std::vector<unsigned char> signature = w.sign(data);
-    ASSERT_FALSE(signature.empty());
-    ASSERT_NE(w.getPublicKey(), nullptr);
-    ASSERT_NE(w.getAddress(), nullptr);
-    // bool isValid = OpenSSLWrapper::verify(w.getPublicKey(), data, signature);
-    // EXPECT_TRUE(isValid);
+  auto address = w.getAddress();
+  EXPECT_NE(address, nullptr);
+
+  std::string data = "Test data for signing";
+  std::vector<unsigned char> signature = w.sign(data);
+  ASSERT_FALSE(signature.empty());
+
+  ASSERT_NE(pub, nullptr);
+
+  bool isValid = OpenSSLWrapper::verify(pub, data, signature);
+  EXPECT_TRUE(isValid);
+
+  EVP_PKEY_free(pub);
 }
