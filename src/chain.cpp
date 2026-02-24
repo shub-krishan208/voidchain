@@ -5,9 +5,9 @@ Blockchain::Blockchain() {
   chain.push_back(Block::genesis());
 }
 
-void Blockchain::addBlock(const std::string data) {
+void Blockchain::addBlock(const std::vector<std::shared_ptr<Txn>> txns) {
   std::lock_guard<std::mutex> lock(chainMutex);
-  Block newTxn = Block::mineBlock(getLatestBlock(), data);
+  Block newTxn = Block::mineBlock(getLatestBlock(), txns);
   chain.push_back(newTxn);
 }
 const Block &Blockchain::getLatestBlock() { return chain.back(); }
@@ -18,7 +18,7 @@ bool Blockchain::isValidBlockchain(const std::vector<Block> &newchain) {
   const Block &fblock = newchain[0];
   if (newchain.empty() || fblock.getHash() != genesis.getHash() ||
       fblock.getLastHash() != genesis.getLastHash() ||
-      fblock.getData() != genesis.getData() ||
+      fblock.getMerkleRoot() != genesis.getMerkleRoot() ||
       fblock.getTimestamp() != genesis.getTimestamp()) {
     return false;
   }
@@ -39,7 +39,7 @@ bool Blockchain::isValidBlockchain(const std::vector<Block> &newchain) {
     std::string recalculatedHash = Block::hashBlock(
         // TODO: check to_string is system independent
         std::to_string(currentBlock.getTimestamp()), currentBlock.getLastHash(),
-        currentBlock.getData());
+        currentBlock.getMerkleRoot());
 
     if (currentBlock.getHash() != recalculatedHash) {
       return false;

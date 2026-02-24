@@ -38,12 +38,16 @@ void Router::registerRoutes() {
           return crow::response(400, "Missing data field");
         }
 
-        std::string data = body_params["data"].s();
+        // std::string data = body_params["data"].s();
 
-        blockchain_.addBlock(data);
+        /** 
+         * TODO: add transactions to the block
+        */ 
+
+        blockchain_.addBlock(std::vector<std::shared_ptr<Txn>>{});
         crow::json::wvalue res;
         res["message"] = "Block added successfully";
-        res["data"] = data;
+        // res["data"] = data;
 
         Block new_block = blockchain_.getLatestBlock();
         res["new_block"] = new_block.toJson();

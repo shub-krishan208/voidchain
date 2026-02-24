@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+#include <memory>
+#include <vector>
 #include "../src/chain.h"
 #include "../src/utils/TimeUtils.h"
+#include "../src/models/CurrencyTxn.h"
 
 using str=std::string;
 #define RESET "\x1B[0m"
@@ -8,13 +11,15 @@ using str=std::string;
 #define SUCCESS "\x1B[32m"
 #define WARNING "\x1B[33m"
 
-void printBlock(str title, Block b) {
-  std::cout << title << "\n"
-            << "Timestamp: " << getFormattedTimestamp(b.getTimestamp()) << "\n"
-            << "Last Hash: " << b.getLastHash() << "\n"
-            << "Hash: " << b.getHash() << "\n"
-            << "Data: " << b.getData() << std::endl;
-}
+// void printBlock(str title, Block b) {
+//   std::cout << title << "\n"
+//             << "Timestamp: " << getFormattedTimestamp(b.getTimestamp()) << "\n"
+//             << "Last Hash: " << b.getLastHash() << "\n"
+//             << "Hash: " << b.getHash() << "\n"
+//             << "Data: " << b.getMerkleRoot() << std::endl;
+// }
+
+
 
 TEST(BlockchainTest, InitializeBlockchain) {
     Blockchain chain;
@@ -23,18 +28,35 @@ TEST(BlockchainTest, InitializeBlockchain) {
 
     // EXPECT_EQ requires objects to be comparable!
     // EXPECT_EQ(latestBlock, genesisBlock);
-    EXPECT_EQ(latestBlock.getData(), genesisBlock.getData());
+    EXPECT_EQ(latestBlock.getMerkleRoot(), genesisBlock.getMerkleRoot());
     EXPECT_EQ(latestBlock.getLastHash(), genesisBlock.getLastHash());
     
 }
 
 TEST(BlockchainTest, AddBlock) {
     Blockchain chain;
-    std::string data = "Test Block Data";
-    chain.addBlock(data);
+
+      auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1, tx2};
+
+
+    chain.addBlock(txns);
 
     Block latestBlock = chain.getLatestBlock();
-    EXPECT_EQ(latestBlock.getData(), data);
+    EXPECT_NE(latestBlock.getMerkleRoot(), "");
 }
 
 TEST(BlockchainTest, ValidateGenesisBlock) {
@@ -45,7 +67,25 @@ TEST(BlockchainTest, ValidateGenesisBlock) {
 
 TEST(BlockchainTest, ValidateBlockchain) {
     Blockchain chain;
-    chain.addBlock("Block 1 Data");
+
+      auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1, tx2};
+
+
+    chain.addBlock(txns);
     
     std::vector<Block> validchain = {Block::genesis(), chain.getLatestBlock()};
     EXPECT_TRUE(Blockchain::isValidBlockchain(validchain));
@@ -53,13 +93,33 @@ TEST(BlockchainTest, ValidateBlockchain) {
 
 TEST(BlockchainTest, InValidateGenesisBlock) {
     // single block chain validates genesis block
-    EXPECT_FALSE(Blockchain::isValidBlockchain({Block::mineBlock(Block::genesis(), "Corrupted Genesis Block")}));
+    std::vector<std::shared_ptr<Txn>> emptyTxs;
+    EXPECT_FALSE(Blockchain::isValidBlockchain({Block::mineBlock(Block::genesis(), emptyTxs)}));
 }
 
 TEST(BlockchainTest, InvalidateBlockchain) {
     Blockchain chain;
-    chain.addBlock("Block 1 Data");
-    chain.addBlock("Block 2");
+
+      auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1};
+
+
+    chain.addBlock(txns);
+    txns.push_back(tx2);
+    chain.addBlock(txns);
 
     std::vector<Block> validchain = {Block::genesis(), chain.getLatestBlock()};
     EXPECT_FALSE(Blockchain::isValidBlockchain(validchain));
@@ -67,36 +127,71 @@ TEST(BlockchainTest, InvalidateBlockchain) {
 
 TEST(BlockchainTest, ReplaceValidBlockchain) {
     Blockchain chain;
-    chain.addBlock("Block 1");
+
+      auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1};
+
+
+    chain.addBlock(txns);
+    txns.push_back(tx2);
+    chain.addBlock(txns);
     
+    // newBlockchain must be LONGER than chain for replaceBlockchain to accept it
     Blockchain newBlockchain;
-    newBlockchain.addBlock("Block 1");
-    newBlockchain.addBlock("Block 2");
+    newBlockchain.addBlock(txns);
+    txns.push_back(tx2);
+    newBlockchain.addBlock(txns);
+    newBlockchain.addBlock(txns); // 4th block makes it longer than chain (3 blocks)
 
     chain.replaceBlockchain(newBlockchain.getChain());
 }
 
 TEST(BlockchainTest, RejectInvalidChainReplacement) {
     Blockchain blockchain;
-    // need at bc of at least 3 blocks to invalidate as there is no consensus implemented yet
-    blockchain.addBlock("Block 1");
-    blockchain.addBlock("Block 2"); 
-    
-    // std::cout<<WARNING<<std::endl;
-    // for(const auto& block : blockchain.getChain()){
-    //     printBlock("Block in Corrupted Chain", block);
-    // }
-    // std::cout<<RESET<<std::endl;
+      auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
 
-    // copy the blockchain and try corrupting the last block
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1, tx2};
+    // need at bc of at least 3 blocks to invalidate as there is no consensus implemented yet
+    blockchain.addBlock(txns);
+    txns.push_back(tx2);
+    blockchain.addBlock(txns); 
+    
+    // copy the blockchain AFTER adding blocks, then corrupt it
     std::vector<Block> corruptedChain = blockchain.getChain();
-    corruptedChain[1] = Block::mineBlock(Block::genesis(), "Corrupted Data");
-    // try replacing with the same lenght
+
+    std::vector<std::shared_ptr<Txn>> emptyTxs;
+    corruptedChain[1] = Block::mineBlock(Block::genesis(), emptyTxs);
+    // try replacing with the same length (should be rejected as not longer)
     EXPECT_THROW({
         blockchain.replaceBlockchain(corruptedChain);
     }, std::invalid_argument);
     
-    corruptedChain.push_back(Block::mineBlock(corruptedChain.back(), "New Block"));
+    corruptedChain.push_back(Block::mineBlock(corruptedChain.back(), txns));
 
     // std::cout<<ERROR<<std::endl;
     // for(const auto& block : corruptedChain){

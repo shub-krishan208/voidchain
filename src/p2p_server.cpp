@@ -44,7 +44,10 @@ void P2pServer::onMessage(WS& conn, const std::string& data, Blockchain& blockch
             std::cout << "[WS] Received CHAIN message.\n";
     
             std::vector<Block> newChain = blockchain.getChain();
-            newChain.push_back(Block::mineBlock(newChain.back(), msg["data"].s()));
+            /**
+             * TODO: add transactions to the block
+            */
+            newChain.push_back(Block::mineBlock(newChain.back(), std::vector<std::shared_ptr<Txn>>{}));
             crow::json::wvalue res;
             res["type"] = "CHAIN";
             res["message"] = "Chain updated. New length: " + std::to_string(newChain.size());

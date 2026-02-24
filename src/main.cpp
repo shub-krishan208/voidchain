@@ -1,6 +1,7 @@
 #include "./utils/TimeUtils.h"
 #include "block.h"
 #include "chain.h"
+#include "models/CurrencyTxn.h"
 #include "p2p_server.h"
 #include "router.h"
 #include "wallet.h"
@@ -15,13 +16,29 @@ void printBlock(str title, Block b) {
             << "Timestamp: " << getFormattedTimestamp(b.getTimestamp()) << "\n"
             << "Last Hash: " << b.getLastHash() << "\n"
             << "Hash: " << b.getHash() << "\n"
-            << "Data: " << b.getData() << std::endl;
+            << "Data: " << b.getMerkleRoot() << std::endl;
 }
 
 void printBlocks() {
+  auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1, tx2};
+
   Block FirstBlock = Block::genesis();
-  Block newBlock = Block::mineBlock(FirstBlock, "blud what's with the data!?");
-  Block block = Block::mineBlock(newBlock, "Another Block Data");
+  Block newBlock = Block::mineBlock(FirstBlock, txns);
+  Block block = Block::mineBlock(newBlock, txns);
   printBlock("Genesis Block", FirstBlock);
   printBlock("Random Block", block);
   printBlock("Mined Block", newBlock);
@@ -30,7 +47,24 @@ void printBlocks() {
 void printChain() {
   Blockchain chain;
   printBlock("Chain initialised", chain.getLatestBlock());
-  chain.addBlock("First added block");
+  auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+
+  auto tx2 = std::make_shared<CurrencyTxn>();
+  tx2->id = "tx002";
+  tx2->from = "bob";
+  tx2->to = "charlie";
+  tx2->amount = 25.0;
+  tx2->signature = "sig_bob_002";
+
+  std::vector<std::shared_ptr<Txn>> txns = {tx1, tx2};
+
+
+  chain.addBlock(txns);
   printBlock("After adding first block", chain.getLatestBlock());
 }
 

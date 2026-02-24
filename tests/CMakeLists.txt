@@ -8,6 +8,7 @@ add_executable(run_tests
     chain_tests.cpp
     wallet_tests.cpp
     txn_tests.cpp
+    merkle_tests.cpp
     # server_tests.cpp
 )
 
