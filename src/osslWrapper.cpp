@@ -67,9 +67,9 @@ std::vector<unsigned char> OpenSSLWrapper::sign(EVP_PKEY *privateKey,
   EVP_MD_CTX_free(mdctx);
 
   // Debug print
-  for (unsigned char b : signature)
-    printf("%02x", b);
-  printf("\n");
+  // for (unsigned char b : signature)
+  // printf("%02x", b);
+  // printf("\n");
 
   return signature;
 }
