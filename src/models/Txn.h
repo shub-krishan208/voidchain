@@ -13,4 +13,5 @@ public:
   virtual ~Txn() = default;
   virtual nlohmann::json toJson() const = 0;
   virtual std::string getType() const = 0;
+  virtual nlohmann::json toSignableJson() const = 0;
 };
