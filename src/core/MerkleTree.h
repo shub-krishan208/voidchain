@@ -13,17 +13,16 @@ public:
     buildTree(txs);
   }
 
-  struct ProofNode{
+  struct ProofNode {
     std::string hash;
     bool isLeft;
   };
 
   const std::string &getRoot() const { return root; }
 
-
   /**
-   * 
-   * @param txHash 
+   *
+   * @param txHash
    * @return Path of sibling hashes from txn leaf to root
    * TODO make a proofNode struct with is left boolean to preserve ordering ....
    */
@@ -34,26 +33,25 @@ public:
     }
 
     // find leaf index
-    const auto& leaves = levels[0];
+    const auto &leaves = levels[0];
     auto it = std::find(leaves.begin(), leaves.end(), txHash);
 
     if (it == leaves.end()) {
-    return proof; // txn not found
+      return proof; // txn not found
     }
-    
 
     size_t idx = std::distance(leaves.begin(), it);
     bool isLeft;
-    //climb up the tree
-    for (size_t level=0; level < levels.size()-1; level++) {
-      const auto& currentLevel = levels[level];
+    // climb up the tree
+    for (size_t level = 0; level < levels.size() - 1; level++) {
+      const auto &currentLevel = levels[level];
 
       size_t siblingIdx;
 
       if (idx % 2 == 0) {
         siblingIdx = idx + 1;
         if (siblingIdx >= currentLevel.size()) {
-        siblingIdx = idx;
+          siblingIdx = idx;
         }
         isLeft = false;
       } else {
@@ -61,40 +59,38 @@ public:
         isLeft = true;
       }
 
-      proof.push_back({ currentLevel[siblingIdx], isLeft });
+      proof.push_back({currentLevel[siblingIdx], isLeft});
       idx /= 2;
     }
-    
+
     return proof;
   }
-  
+
   /**
-   * 
-   * @param root 
-   * @param txHash 
-   * @param proof 
+   *
+   * @param root
+   * @param txHash
+   * @param proof
    * @return Bool for verification
    */
-  static bool verifyProof(
-    const std::string& root,
-    const std::string& txHash,
-    const std::vector<ProofNode>& proof){
-   
-      Hasher h;
-      std::string current = txHash;
+  static bool verifyProof(const std::string &root, const std::string &txHash,
+                          const std::vector<ProofNode> &proof) {
 
-      for (const auto &node : proof) {
-        Hasher k;
-        if(node.isLeft){
-          k.add(node.hash);
-          k.add(current);
-        } else {
-          k.add(current);
-          k.add(node.hash);
-        }
-        current = k.finish();
+    Hasher h;
+    std::string current = txHash;
+
+    for (const auto &node : proof) {
+      Hasher k;
+      if (node.isLeft) {
+        k.add(node.hash);
+        k.add(current);
+      } else {
+        k.add(current);
+        k.add(node.hash);
       }
-      return current == root;
+      current = k.finish();
+    }
+    return current == root;
   }
 
 private:
@@ -117,11 +113,11 @@ private:
     levels.clear();
 
     if (txs.empty()) {
-      root = "";
+      root = hash("");
       return;
     }
 
-    //build leaves
+    // build leaves
     std::vector<std::string> level;
 
     for (const auto &tx : txs)
@@ -129,7 +125,7 @@ private:
 
     levels.push_back(level); // leaves are the txn hashes
 
-    //build upwards
+    // build upwards
     while (level.size() > 1) {
       if (level.size() % 2 != 0)
         level.push_back(level.back());
