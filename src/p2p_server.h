@@ -19,7 +19,9 @@ private:
     std::mutex peersMutex;
 };
 
-enum class MessageTypes {
+enum class MSGTYPES {
     CHAIN,
-    TRANSACTION
+    CURRENCY,
+    ASSET,
+    ERROR
 };
