@@ -9,6 +9,7 @@ add_executable(run_tests
     wallet_tests.cpp
     txn_tests.cpp
     merkle_tests.cpp
+    hashing_test.cpp
     # server_tests.cpp
 )
 
