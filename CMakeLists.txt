@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Crow CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(UUID REQUIRED IMPORTED_TARGET uuid)
 
 # core library to be reused in apps and subapps (tests)
 add_library(voidchain_core 
@@ -15,7 +17,11 @@ add_library(voidchain_core
     src/p2p_server.cpp
     src/osslWrapper.cpp
     src/wallet.cpp
+    src/TxnPool.cpp
     src/utils/hashing.cpp
+    src/core/TxnFactory.cpp
+    src/models/CurrencyTxn.cpp
+    src/models/AssetTxn.cpp
 )
 
 # complete core library dependencies
@@ -24,6 +30,7 @@ target_link_libraries(voidchain_core PUBLIC
     Crow::Crow
     OpenSSL::SSL
     OpenSSL::Crypto
+    PkgConfig::UUID
 )
 
 add_executable(voidchain src/main.cpp)
