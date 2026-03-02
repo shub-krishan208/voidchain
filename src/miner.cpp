@@ -9,9 +9,9 @@ Block Miner::mine() {
   auto txns = pool_.getTxn();
 
   Block lastBlock = chain_.getLatestBlock();
-  Block newBlock = Block::mineBlock(lastBlock, txns);
+  // Block newBlock = Block::mineBlock(lastBlock, txns);
 
-  chain_.addBlock(newBlock);
+  Block newBlock = chain_.addBlock(txns);
 
   pool_.clear(); // clear the txn pool
 

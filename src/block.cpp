@@ -1,19 +1,16 @@
 #include "block.h"
 #include "core/MerkleTree.h"
+#include "core/TxnFactory.h"
 #include "utils/TimeUtils.h"
 #include "utils/hashing.h"
+#include <cstddef>
+#include <nlohmann/json.hpp>
 
-Block::Block(const int64_t timestamp, 
-             const std::string lastHash,
-             const std::string hash, 
-             const std::string merkleRoot,
-             const std::vector<std::shared_ptr<Txn>>& txs)
-    : timestamp(timestamp), 
-      lastHash(lastHash), 
-      hash(hash),
-      merkleRoot(merkleRoot), 
-      transactions(txs) {}
-
+Block::Block(const int64_t timestamp, const std::string lastHash,
+             const std::string hash, const std::string merkleRoot,
+             const std::vector<std::shared_ptr<Txn>> &txs)
+    : timestamp(timestamp), lastHash(lastHash), hash(hash),
+      merkleRoot(merkleRoot), transactions(txs) {}
 
 Block Block::genesis() {
   std::string prevGenesisHash(64, '0');
@@ -28,7 +25,6 @@ Block Block::genesis() {
   return Block(GENESIS_TIMESTAMP, prevGenesisHash, hash, root, emptyTxs);
 }
 
-
 Block Block::mineBlock(Block lastBlock, std::vector<std::shared_ptr<Txn>> txs) {
 
   int64_t timestamp = getCurrentTime();
@@ -42,7 +38,6 @@ Block Block::mineBlock(Block lastBlock, std::vector<std::shared_ptr<Txn>> txs) {
   return Block(timestamp, lastBlock.getHash(), hash, root, txs);
 }
 
-
 std::string Block::hashBlock(std::string timestamp, std::string lastHash,
                              std::string merkleRoot) {
 
@@ -54,7 +49,6 @@ std::string Block::hashBlock(std::string timestamp, std::string lastHash,
   return h.finish();
 }
 
-
 crow::json::wvalue Block::toJson() const {
 
   crow::json::wvalue json;
@@ -64,20 +58,18 @@ crow::json::wvalue Block::toJson() const {
   json["hash"] = hash;
   json["merkle_root"] = merkleRoot;
 
-  crow::json::wvalue txArray;
+  std::vector<crow::json::wvalue> txList;
 
   for (size_t i = 0; i < transactions.size(); ++i) {
     std::string txStr = transactions[i]->toJson().dump();
-    txArray[i] = crow::json::load(txStr);
+    txList.push_back(crow::json::load(txStr));
   }
 
-  json["transactions"] = std::move(txArray);
+  json["transactions"] = std::move(txList);
 
   return json;
 }
 
-
-// ==============================
 Block Block::fromJson(const crow::json::rvalue &json) {
 
   int64_t timestamp = json["timestamp"].i();
@@ -85,8 +77,27 @@ Block Block::fromJson(const crow::json::rvalue &json) {
   std::string hash = json["hash"].s();
   std::string merkleRoot = json["merkle_root"].s();
 
-  // NOTE: Full Tx reconstruction will be implemented in Day 12
-  std::vector<std::shared_ptr<Txn>> txs;
+  std::vector<std::shared_ptr<Txn>> txns;
 
-  return Block(timestamp, lastHash, hash, merkleRoot, txs);
+  // transactions field sent over the network is an array of txns
+  const auto &txArray = json["transactions"];
+
+  for (size_t i = 0; i < txArray.size(); i++) {
+    // convert crow::json::rvalue object to string then parse with
+    // nlohmann::json
+    std::string txStr = crow::json::wvalue(txArray[i]).dump();
+    nlohmann::json j = nlohmann::json::parse(txStr);
+
+    auto txn = TxnFactory::createTxn(j);
+    txns.push_back(txn);
+  }
+
+  MerkleTree tree(txns);
+  std::string computedRoot = tree.getRoot();
+
+  if (computedRoot != merkleRoot) {
+    throw std::runtime_error("Invalid block: Merkle root mismatch");
+  }
+
+  return Block(timestamp, lastHash, hash, merkleRoot, txns);
 }
