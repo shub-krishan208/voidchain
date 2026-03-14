@@ -12,6 +12,7 @@ public:
 
   EVP_PKEY *getPublicKey() const;
   EVP_PKEY *getAddress() const;
+  std::string getAddressPem() const;
   std::vector<unsigned char> sign(const std::string &data) const;
   void signTxn(Txn &txn) const;
 

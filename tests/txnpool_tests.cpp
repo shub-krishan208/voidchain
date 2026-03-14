@@ -14,22 +14,7 @@ makeSignedCurrencyTxn(Wallet &w, const std::string &to, double amount) {
   auto txn = std::make_shared<CurrencyTxn>();
   txn->to = to;
   txn->amount = amount;
-
-  // signTxn requires a Txn&, so dereference and then copy back via shared_ptr
   w.signTxn(*txn);
-
-  // after signing, `from` is still whatever we left it — the pool's verifyTxn
-  // needs `from` to hold the PEM public key so the signature can be checked.
-  EVP_PKEY *pub = w.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(pub);
-  EVP_PKEY_free(pub);
-
-  // re-sign because `from` changed after the first sign
-  // we need to clear signature first and resign with correct `from`
-  txn->signature.clear();
-  txn->id.clear();
-  w.signTxn(*txn);
-
   return txn;
 }
 
@@ -39,9 +24,6 @@ static std::shared_ptr<AssetTxn> makeSignedAssetTxn(Wallet &w,
                                                     const std::string &itemId,
                                                     const std::string &meta) {
   auto txn = std::make_shared<AssetTxn>();
-  EVP_PKEY *pub = w.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(pub);
-  EVP_PKEY_free(pub);
   txn->to = to;
   txn->itemId = itemId;
   txn->meta = meta;
@@ -175,16 +157,15 @@ TEST(TxnPoolTest, RejectTxnSignedByDifferentWallet) {
   TxnPool pool;
   Wallet signer, impersonator;
 
-  // sign with `signer` wallet but use `impersonator`'s public key as `from`
+  // sign bytes with one wallet but claim another wallet's public key as sender
   auto txn = std::make_shared<CurrencyTxn>();
-  EVP_PKEY *impPub = impersonator.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(impPub);
-  EVP_PKEY_free(impPub);
+  txn->id = "forged-id";
+  txn->from = impersonator.getAddressPem();
   txn->to = "bob";
   txn->amount = 100.0;
 
-  // sign with the wrong wallet
-  signer.signTxn(*txn);
+  auto forgedSig = signer.sign(txn->toSignableJson().dump());
+  txn->signature = HexUtils::toHex(forgedSig);
 
   EXPECT_FALSE(pool.addTxn(txn));
   EXPECT_EQ(pool.getTxn().size(), 0u);

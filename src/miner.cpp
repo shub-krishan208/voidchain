@@ -2,18 +2,21 @@
 #include "TxnPool.h"
 #include "block.h"
 #include "chain.h"
+#include <stdexcept>
 
 Miner::Miner(Blockchain &chain, TxnPool &pool) : chain_(chain), pool_(pool) {}
 
 Block Miner::mine() {
   auto txns = pool_.getTxn();
-
-  Block lastBlock = chain_.getLatestBlock();
-  // Block newBlock = Block::mineBlock(lastBlock, txns);
+  if (txns.empty()) {
+    throw std::runtime_error("Error: no transactions in pool to mine");
+  }
 
   Block newBlock = chain_.addBlock(txns);
 
-  pool_.clear(); // clear the txn pool
+  for (const auto &txn : txns) {
+    pool_.remove(txn->id);
+  }
 
   return newBlock;
 }

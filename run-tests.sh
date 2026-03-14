@@ -10,5 +10,5 @@ if [ $? -ne 0 ]; then
 else
   echo "All tests passed!"
 fi
-echo "Running VoidChain ..."
-./build/$mode/voidchain
+# echo "Running VoidChain ..."
+# ./build/$mode/voidchain

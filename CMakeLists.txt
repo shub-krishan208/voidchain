@@ -18,6 +18,7 @@ add_library(voidchain_core
     src/osslWrapper.cpp
     src/wallet.cpp
     src/TxnPool.cpp
+    src/miner.cpp
     src/utils/hashing.cpp
     src/core/TxnFactory.cpp
     src/models/CurrencyTxn.cpp
