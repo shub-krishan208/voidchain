@@ -7,6 +7,7 @@ add_executable(run_tests
     block_tests.cpp
     chain_tests.cpp
     miner_tests.cpp
+    p2p_tests.cpp
     wallet_tests.cpp
     txn_tests.cpp
     txnpool_tests.cpp

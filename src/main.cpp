@@ -4,9 +4,28 @@
 #include "miner.h"
 #include "models/AssetTxn.h"
 #include "models/CurrencyTxn.h"
+#include "network/PeerClient.h"
 #include "p2p_server.h"
 #include "router.h"
 #include "wallet.h"
+#include <cstdlib>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace {
+std::vector<std::string> parsePeers(const std::string &raw) {
+  std::vector<std::string> peers;
+  std::stringstream ss(raw);
+  std::string peer;
+  while (std::getline(ss, peer, ',')) {
+    if (!peer.empty()) {
+      peers.push_back(peer);
+    }
+  }
+  return peers;
+}
+} // namespace
 
 int main() {
   TxnFactory::registerType("CURRENCY", CurrencyTxn::fromJson);
@@ -18,8 +37,23 @@ int main() {
   Miner miner(blockchain, pool, wallet);
 
   crow::SimpleApp app;
-
   P2pServer p2p;
+
+  PeerClient peerClient(
+      [&p2p, &blockchain, &pool](const std::string &message) mutable {
+        p2p.onPeerMessage(message, blockchain, pool);
+      });
+  p2p.setOutboundBroadcaster([&peerClient](const std::string &message) {
+    peerClient.broadcast(message);
+  });
+
+  const char *peersEnv = std::getenv("PEERS");
+  if (peersEnv != nullptr) {
+    for (const auto &peer : parsePeers(peersEnv)) {
+      peerClient.connectToPeer(peer);
+    }
+  }
+
   CROW_WEBSOCKET_ROUTE(app, "/ws")
       .onopen([&p2p, &blockchain](crow::websocket::connection &conn) {
         p2p.onOpen(conn, blockchain);
@@ -27,16 +61,22 @@ int main() {
       .onclose([&p2p](crow::websocket::connection &conn,
                       const std::string &reason,
                       uint16_t code) { p2p.onClose(conn); })
-      .onmessage([&p2p, &blockchain](crow::websocket::connection &conn,
+      .onmessage([&p2p, &blockchain, &pool](crow::websocket::connection &conn,
                              const std::string &data, bool is_binary) {
         if (!is_binary) {
-          p2p.onMessage(conn, data, blockchain);
+          p2p.onMessage(conn, data, blockchain, pool);
         }
       });
 
-  Router router(app, blockchain, wallet, pool, miner);
+  Router router(app, blockchain, wallet, pool, miner, p2p, peerClient);
   router.registerRoutes();
 
-  app.port(18169).multithreaded().run();
+  int port = 18169;
+  const char *portEnv = std::getenv("PORT");
+  if (portEnv != nullptr) {
+    port = std::stoi(portEnv);
+  }
+
+  app.port(static_cast<uint16_t>(port)).multithreaded().run();
   return 0;
 }

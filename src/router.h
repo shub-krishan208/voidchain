@@ -7,11 +7,13 @@ class Blockchain;
 class Wallet;
 class TxnPool;
 class Miner;
+class P2pServer;
+class PeerClient;
 
 class Router {
 public:
     Router(crow::SimpleApp& app, Blockchain& blockchain, Wallet& wallet,
-           TxnPool& pool, Miner& miner);
+           TxnPool& pool, Miner& miner, P2pServer& p2p, PeerClient& peerClient);
     void registerRoutes();
 
 private:
@@ -19,6 +21,8 @@ private:
     Wallet& wallet_;
     TxnPool& pool_;
     Miner& miner_;
+    P2pServer& p2p_;
+    PeerClient& peerClient_;
     crow::SimpleApp& app_;
 };
 

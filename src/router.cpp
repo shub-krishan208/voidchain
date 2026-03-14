@@ -3,6 +3,8 @@
 #include "chain.h"
 #include "core/TxnFactory.h"
 #include "miner.h"
+#include "network/PeerClient.h"
+#include "p2p_server.h"
 #include "wallet.h"
 #include <crow/http_response.h>
 #include <crow/json.h>
@@ -10,9 +12,10 @@
 #include <stdexcept>
 
 Router::Router(crow::SimpleApp &app, Blockchain &blockchain, Wallet &wallet,
-               TxnPool &pool, Miner &miner)
+               TxnPool &pool, Miner &miner, P2pServer &p2p,
+               PeerClient &peerClient)
     : blockchain_(blockchain), wallet_(wallet), pool_(pool), miner_(miner),
-      app_(app) {}
+      p2p_(p2p), peerClient_(peerClient), app_(app) {}
 
 void Router::registerRoutes() {
   CROW_ROUTE(app_, "/health")([this]() {
@@ -68,6 +71,10 @@ void Router::registerRoutes() {
             return crow::response(400, "Invalid transaction");
           }
 
+          const std::string msg = P2pServer::makeTransactionMessage(*txn);
+          p2p_.broadcastMessage(msg);
+          peerClient_.broadcast(msg);
+
           crow::json::wvalue res;
           res["message"] = "Transaction added to pool";
           res["transaction"] = crow::json::load(txn->toJson().dump());
@@ -82,6 +89,10 @@ void Router::registerRoutes() {
         (void)req;
         try {
           Block newBlock = miner_.mine();
+          const std::string msg = P2pServer::makeBlockMessage(newBlock);
+          p2p_.broadcastMessage(msg);
+          peerClient_.broadcast(msg);
+
           crow::json::wvalue res;
           res["message"] = "Block mined successfully";
           res["new_block"] = newBlock.toJson();
@@ -91,5 +102,20 @@ void Router::registerRoutes() {
         } catch (const std::exception &e) {
           return crow::response(500, e.what());
         }
+      });
+
+  CROW_ROUTE(app_, "/peer/message")
+      .methods(crow::HTTPMethod::POST)([this](const crow::request &req) {
+        try {
+          auto parsed = nlohmann::json::parse(req.body);
+          (void)parsed;
+        } catch (const std::exception &) {
+          return crow::response(400, "Invalid peer message JSON");
+        }
+
+        const bool applied = p2p_.onPeerMessage(req.body, blockchain_, pool_);
+        crow::json::wvalue res;
+        res["applied"] = applied;
+        return crow::response(200, res);
       });
 }
