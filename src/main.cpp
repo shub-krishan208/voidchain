@@ -7,6 +7,7 @@
 #include "network/PeerClient.h"
 #include "p2p_server.h"
 #include "router.h"
+#include "utils/env.h"
 #include "wallet.h"
 #include <cstdlib>
 #include <sstream>
@@ -28,6 +29,7 @@ std::vector<std::string> parsePeers(const std::string &raw) {
 } // namespace
 
 int main() {
+  loadEnv(".env");
   TxnFactory::registerType("CURRENCY", CurrencyTxn::fromJson);
   TxnFactory::registerType("ASSET", AssetTxn::fromJson);
 
@@ -62,7 +64,8 @@ int main() {
                       const std::string &reason,
                       uint16_t code) { p2p.onClose(conn); })
       .onmessage([&p2p, &blockchain, &pool](crow::websocket::connection &conn,
-                             const std::string &data, bool is_binary) {
+                                            const std::string &data,
+                                            bool is_binary) {
         if (!is_binary) {
           p2p.onMessage(conn, data, blockchain, pool);
         }
@@ -72,11 +75,11 @@ int main() {
   router.registerRoutes();
 
   int port = 18169;
-  const char *portEnv = std::getenv("PORT");
-  if (portEnv != nullptr) {
-    port = std::stoi(portEnv);
+  if (const char *portEnv = std::getenv("PORT")) {
+    std::cout << "Env Loaded ...\n";
+    port = std::atoi(portEnv);
   }
-
+  std::cout << "PORT: " << port << "\n";
   app.port(static_cast<uint16_t>(port)).multithreaded().run();
   return 0;
 }
