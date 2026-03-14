@@ -1,5 +1,7 @@
 #include "chain.h"
 #include "block.h"
+#include <cstdlib>
+#include <string>
 #include <stdexcept>
 Blockchain::Blockchain() {
   // initialize with the genesis block
@@ -30,25 +32,48 @@ bool Blockchain::isValidBlock(const Block &block, const Block &previousBlock) {
   if (block.getLastHash() != previousBlock.getHash()) {
     return false;
   }
+
+  if (block.getDifficulty() < 1) {
+    return false;
+  }
+
+  if (std::abs(block.getDifficulty() - previousBlock.getDifficulty()) > 1) {
+    return false;
+  }
+
   std::string recalculatedHash =
       Block::hashBlock(std::to_string(block.getTimestamp()),
-                       block.getLastHash(), block.getMerkleRoot());
+                       block.getLastHash(), block.getMerkleRoot(),
+                       block.getNonce(), block.getDifficulty());
   if (block.getHash() != recalculatedHash) {
     return false;
   }
+
+  const std::string target(static_cast<size_t>(block.getDifficulty()), '0');
+  if (block.getHash().substr(0, static_cast<size_t>(block.getDifficulty())) !=
+      target) {
+    return false;
+  }
+
   return true;
 }
 
 const Block &Blockchain::getLatestBlock() { return chain.back(); }
 
 bool Blockchain::isValidBlockchain(const std::vector<Block> &newchain) {
+  if (newchain.empty()) {
+    return false;
+  }
+
   // check if the first block is valid genesis block
   const Block &genesis = Block::genesis();
   const Block &fblock = newchain[0];
-  if (newchain.empty() || fblock.getHash() != genesis.getHash() ||
+  if (fblock.getHash() != genesis.getHash() ||
       fblock.getLastHash() != genesis.getLastHash() ||
       fblock.getMerkleRoot() != genesis.getMerkleRoot() ||
-      fblock.getTimestamp() != genesis.getTimestamp()) {
+      fblock.getTimestamp() != genesis.getTimestamp() ||
+      fblock.getDifficulty() != genesis.getDifficulty() ||
+      fblock.getNonce() != genesis.getNonce()) {
     return false;
   }
   // singlie block chain

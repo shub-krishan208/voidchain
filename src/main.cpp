@@ -15,7 +15,7 @@ int main() {
   Blockchain blockchain;
   Wallet wallet;
   TxnPool pool;
-  Miner miner(blockchain, pool);
+  Miner miner(blockchain, pool, wallet);
 
   crow::SimpleApp app;
 

@@ -2,6 +2,7 @@
 #include <memory>
 #include <vector>
 #include "../src/chain.h"
+#include "../src/core/TxnFactory.h"
 #include "../src/utils/TimeUtils.h"
 #include "../src/models/CurrencyTxn.h"
 
@@ -202,4 +203,46 @@ TEST(BlockchainTest, RejectInvalidChainReplacement) {
     EXPECT_THROW({
         blockchain.replaceBlockchain(corruptedChain);
     }, std::invalid_argument);
+}
+
+TEST(BlockchainTest, RejectBlockWithInvalidDifficultyRequirement) {
+  TxnFactory::registerType("CURRENCY", CurrencyTxn::fromJson);
+
+  auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+  std::vector<std::shared_ptr<Txn>> txns = {tx1};
+
+  Block genesis = Block::genesis();
+  Block mined = Block::mineBlock(genesis, txns);
+
+  auto json = mined.toJson();
+  json["difficulty"] = 64;
+  auto tampered = Block::fromJson(crow::json::load(json.dump()));
+
+  EXPECT_FALSE(Blockchain::isValidBlock(tampered, genesis));
+}
+
+TEST(BlockchainTest, RejectBlockWithTamperedNonceOrHashInputs) {
+  TxnFactory::registerType("CURRENCY", CurrencyTxn::fromJson);
+
+  auto tx1 = std::make_shared<CurrencyTxn>();
+  tx1->id = "tx001";
+  tx1->from = "alice";
+  tx1->to = "bob";
+  tx1->amount = 50.0;
+  tx1->signature = "sig_alice_001";
+  std::vector<std::shared_ptr<Txn>> txns = {tx1};
+
+  Block genesis = Block::genesis();
+  Block mined = Block::mineBlock(genesis, txns);
+
+  auto json = mined.toJson();
+  json["nonce"] = mined.getNonce() + 1;
+  auto tampered = Block::fromJson(crow::json::load(json.dump()));
+
+  EXPECT_FALSE(Blockchain::isValidBlock(tampered, genesis));
 }

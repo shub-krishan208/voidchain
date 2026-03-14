@@ -34,18 +34,29 @@ std::shared_ptr<AssetTxn> makeSignedAssetTxn(Wallet &wallet,
 
 TEST(MinerTest, MineThrowsWhenPoolIsEmpty) {
   Blockchain blockchain;
+  Wallet wallet;
   TxnPool pool;
-  Miner miner(blockchain, pool);
+  Miner miner(blockchain, pool, wallet);
 
-  EXPECT_THROW(miner.mine(), std::runtime_error);
-  EXPECT_EQ(blockchain.getChain().size(), 1u);
+  Block mined = miner.mine();
+  EXPECT_EQ(blockchain.getChain().size(), 2u);
+
+  auto minedJson = crow::json::load(mined.toJson().dump());
+  ASSERT_TRUE(minedJson);
+  ASSERT_EQ(minedJson["transactions"].size(), 1u);
+
+  auto reward = minedJson["transactions"][0];
+  EXPECT_EQ(std::string(reward["type"].s()), "CURRENCY");
+  EXPECT_EQ(std::string(reward["from"].s()), "COINBASE");
+  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddressPem());
+  EXPECT_DOUBLE_EQ(reward["amount"].d(), Miner::MINING_REWARD);
 }
 
 TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
   Blockchain blockchain;
   TxnPool pool;
-  Miner miner(blockchain, pool);
   Wallet wallet;
+  Miner miner(blockchain, pool, wallet);
 
   auto tx1 = makeSignedCurrencyTxn(wallet, "bob", 10.0);
   auto tx2 = makeSignedAssetTxn(wallet, "charlie", "item-77", "epic");
@@ -63,6 +74,11 @@ TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
 
   auto minedJson = crow::json::load(mined.toJson().dump());
   ASSERT_TRUE(minedJson);
-  ASSERT_EQ(minedJson["transactions"].size(), 2u);
+  ASSERT_EQ(minedJson["transactions"].size(), 3u);
+
+  auto reward = minedJson["transactions"][0];
+  EXPECT_EQ(std::string(reward["from"].s()), "COINBASE");
+  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddressPem());
+  EXPECT_DOUBLE_EQ(reward["amount"].d(), Miner::MINING_REWARD);
 }
 

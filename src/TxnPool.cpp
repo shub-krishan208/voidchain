@@ -1,4 +1,5 @@
 #include "TxnPool.h"
+#include "models/CurrencyTxn.h"
 #include "osslWrapper.h"
 #include "utils/hex.h"
 
@@ -25,6 +26,16 @@ bool TxnPool::verifyTxn(const std::shared_ptr<Txn> &txn) const {
     return false;
   if (pool_.find(txn->id) != pool_.end())
     return false;
+  if (txn->id.empty())
+    return false;
+
+  if (txn->from == "COINBASE") {
+    auto rewardTxn = std::dynamic_pointer_cast<CurrencyTxn>(txn);
+    if (!rewardTxn)
+      return false;
+    return !rewardTxn->to.empty() && rewardTxn->amount > 0.0;
+  }
+
   if (txn->signature.empty())
     return false;
   if (txn->from.empty())

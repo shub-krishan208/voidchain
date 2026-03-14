@@ -128,6 +128,34 @@ TEST(TxnPoolTest, RejectTxnWithEmptyFrom) {
   EXPECT_EQ(pool.getTxn().size(), 0u);
 }
 
+TEST(TxnPoolTest, AcceptCoinbaseCurrencyTxnWithoutSignature) {
+  TxnPool pool;
+
+  auto reward = std::make_shared<CurrencyTxn>();
+  reward->id = "coinbase-001";
+  reward->from = "COINBASE";
+  reward->to = "miner-address";
+  reward->amount = 50.0;
+  reward->signature = "";
+
+  EXPECT_TRUE(pool.addTxn(reward));
+  EXPECT_EQ(pool.getTxn().size(), 1u);
+}
+
+TEST(TxnPoolTest, RejectCoinbaseIfNotCurrencyTxn) {
+  TxnPool pool;
+
+  auto invalidReward = std::make_shared<AssetTxn>();
+  invalidReward->id = "coinbase-asset";
+  invalidReward->from = "COINBASE";
+  invalidReward->to = "miner-address";
+  invalidReward->itemId = "item-1";
+  invalidReward->meta = "invalid";
+
+  EXPECT_FALSE(pool.addTxn(invalidReward));
+  EXPECT_EQ(pool.getTxn().size(), 0u);
+}
+
 TEST(TxnPoolTest, RejectTxnWithInvalidPEMKey) {
   TxnPool pool;
 

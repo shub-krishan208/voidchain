@@ -15,20 +15,28 @@
 
 class Block {
 public:
-  Block(const int64_t timestamp, 
-        const std::string lastHash,
-        const std::string hash, 
-        const std::string merkleRoot, 
-        const std::vector<std::shared_ptr<Txn>>& transactions);
-  
-        const int64_t &getTimestamp() const { return timestamp; };
+  static constexpr int INITIAL_DIFFICULTY = 2;
+  static constexpr int MINE_RATE_MS = 3000;
+
+  Block(const int64_t timestamp, const std::string lastHash,
+        const std::string hash, const std::string merkleRoot,
+        const std::vector<std::shared_ptr<Txn>> &transactions, const int nonce,
+        const int difficulty);
+
+  const int64_t &getTimestamp() const { return timestamp; };
   const std::string &getLastHash() const { return lastHash; };
   const std::string &getHash() const { return hash; };
   const std::string &getMerkleRoot() const { return merkleRoot; };
+  int getNonce() const { return nonce; };
+  int getDifficulty() const { return difficulty; };
   static Block genesis();
-  static Block mineBlock(Block lastBlock, std::vector<std::shared_ptr<Txn>> transactions);
-  static std::string hashBlock(std::string timestamp, std::string lastHash,
-                               std::string merkleRoot);
+  static Block
+  mineBlock(const Block &lastBlock, std::vector<std::shared_ptr<Txn>> txns);
+  static std::string hashBlock(const std::string &timestamp,
+                               const std::string &lastHash,
+                               const std::string &merkleRoot, const int nonce,
+                               const int difficulty);
+  static int adjustDifficulty(const Block &lastBlock, int64_t currentTime);
 
   crow::json::wvalue toJson() const;
   static Block fromJson(const crow::json::rvalue &json);
@@ -40,6 +48,8 @@ private:
 
   std::vector<std::shared_ptr<Txn>> transactions;
   std::string merkleRoot;
+  int nonce;
+  int difficulty;
 };
 
 #endif // VOID_BLOCK_H
