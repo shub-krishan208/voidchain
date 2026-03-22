@@ -18,7 +18,7 @@ export default function Home() {
         <div className="mt-9 flex flex-wrap gap-3">
           <Link
             href="/blocks"
-            className="rounded-md border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-primary-strong"
+            className="rounded-md border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-foreground transition hover:bg-primary-strong"
           >
             Launch Explorer
           </Link>

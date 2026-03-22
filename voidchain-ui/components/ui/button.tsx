@@ -11,13 +11,13 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "border-primary bg-primary text-black hover:bg-primary-strong focus-visible:ring-primary/60",
+    "border-primary bg-primary text-foreground hover:bg-primary-strong focus-visible:ring-primary/60",
   secondary:
     "border-border bg-surface-2 text-foreground hover:border-primary hover:text-primary-strong focus-visible:ring-primary/40",
   ghost:
     "border-transparent bg-transparent text-muted hover:bg-surface-2 hover:text-foreground focus-visible:ring-primary/30",
   danger:
-    "border-danger bg-danger/90 text-black hover:bg-danger focus-visible:ring-danger/40",
+    "border-danger bg-danger/90 text-foreground hover:bg-danger focus-visible:ring-danger/40",
 };
 
 export function Button({
