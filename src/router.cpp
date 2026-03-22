@@ -1,14 +1,19 @@
 #include "router.h"
 #include "TxnPool.h"
 #include "chain.h"
+#include "core/MerkleTree.h"
+#include "core/State.h"
 #include "core/TxnFactory.h"
 #include "miner.h"
 #include "network/PeerClient.h"
 #include "p2p_server.h"
+#include "utils/hashing.h"
 #include "wallet.h"
 #include <crow/http_response.h>
 #include <crow/json.h>
 #include <nlohmann/json.hpp>
+#include <mutex>
+#include <set>
 #include <stdexcept>
 
 Router::Router(crow::SimpleApp &app, Blockchain &blockchain, Wallet &wallet,
@@ -33,6 +38,160 @@ void Router::registerRoutes() {
     }
     return res;
   });
+
+  CROW_ROUTE(app_, "/headers")([this]() {
+    crow::json::wvalue res;
+    std::vector<Block> chainSnapshot;
+    {
+      std::lock_guard<std::mutex> lock(blockchain_.chainMutex);
+      chainSnapshot = blockchain_.getChain();
+    }
+
+    int idx = 0;
+    for (const auto &block : chainSnapshot) {
+      auto header = block.headerToJson();
+      header["height"] = idx;
+      res["headers"][idx++] = std::move(header);
+    }
+    return res;
+  });
+
+  CROW_ROUTE(app_, "/proof")
+      .methods(crow::HTTPMethod::GET)([this](const crow::request &req) {
+        const char *txId = req.url_params.get("txId");
+        if (txId == nullptr || std::string(txId).empty()) {
+          return crow::response(400, "Missing required query param: txId");
+        }
+
+        try {
+          std::vector<Block> chainSnapshot;
+          {
+            std::lock_guard<std::mutex> lock(blockchain_.chainMutex);
+            chainSnapshot = blockchain_.getChain();
+          }
+
+          size_t blockIndex = 0;
+          std::shared_ptr<Txn> foundTxn;
+          if (!Blockchain::findTransactionInChain(chainSnapshot,
+                                                  std::string(txId), blockIndex,
+                                                  foundTxn)) {
+            return crow::response(404, "Transaction not found");
+          }
+
+          const auto &containingBlock = chainSnapshot[blockIndex];
+          Hasher txHasher;
+          txHasher.add(foundTxn->toJson().dump());
+          const std::string txHash = txHasher.finish();
+
+          MerkleTree tree(containingBlock.getTransactions());
+          const auto proof = tree.getProof(txHash);
+
+          crow::json::wvalue res;
+          res["txId"] = std::string(txId);
+          res["txHash"] = txHash;
+          res["txData"] = crow::json::load(foundTxn->toJson().dump());
+          res["root"] = containingBlock.getMerkleRoot();
+          res["block"] = containingBlock.headerToJson();
+          res["block"]["height"] = static_cast<int>(blockIndex);
+
+          std::vector<crow::json::wvalue> proofNodes;
+          proofNodes.reserve(proof.size());
+          for (const auto &node : proof) {
+            crow::json::wvalue proofNode;
+            proofNode["hash"] = node.hash;
+            proofNode["isLeft"] = node.isLeft;
+            proofNodes.push_back(std::move(proofNode));
+          }
+          res["proof"] = std::move(proofNodes);
+          return crow::response(200, res);
+        } catch (const std::exception &e) {
+          return crow::response(500, e.what());
+        }
+      });
+
+  CROW_ROUTE(app_, "/state")([this]() {
+    try {
+      const DerivedState state = State::deriveFromChainOrThrow(blockchain_.getChain());
+      nlohmann::json payload;
+      payload["balances"] = state.balances;
+      payload["owner_by_asset"] = state.ownerByAsset;
+      payload["assets_by_owner"] = state.assetsByOwner;
+
+      crow::json::wvalue res = crow::json::load(payload.dump());
+      return crow::response(200, res);
+    } catch (const std::exception &e) {
+      return crow::response(500, e.what());
+    }
+  });
+
+  CROW_ROUTE(app_, "/balance")
+      .methods(crow::HTTPMethod::GET)([this](const crow::request &req) {
+        const char *address = req.url_params.get("address");
+        if (address == nullptr || std::string(address).empty()) {
+          return crow::response(400, "Missing required query param: address");
+        }
+
+        try {
+          const DerivedState state =
+              State::deriveFromChainOrThrow(blockchain_.getChain());
+          crow::json::wvalue res;
+          res["address"] = std::string(address);
+          res["balance"] = State::getBalance(state, std::string(address));
+          return crow::response(200, res);
+        } catch (const std::exception &e) {
+          return crow::response(500, e.what());
+        }
+      });
+
+  CROW_ROUTE(app_, "/owner")
+      .methods(crow::HTTPMethod::GET)([this](const crow::request &req) {
+        const char *itemId = req.url_params.get("itemId");
+        if (itemId == nullptr || std::string(itemId).empty()) {
+          return crow::response(400, "Missing required query param: itemId");
+        }
+
+        try {
+          const DerivedState state =
+              State::deriveFromChainOrThrow(blockchain_.getChain());
+          const std::string owner = State::getOwner(state, std::string(itemId));
+          if (owner.empty()) {
+            return crow::response(404, "Asset owner not found");
+          }
+
+          crow::json::wvalue res;
+          res["itemId"] = std::string(itemId);
+          res["owner"] = owner;
+          return crow::response(200, res);
+        } catch (const std::exception &e) {
+          return crow::response(500, e.what());
+        }
+      });
+
+  CROW_ROUTE(app_, "/assets")
+      .methods(crow::HTTPMethod::GET)([this](const crow::request &req) {
+        const char *address = req.url_params.get("address");
+        if (address == nullptr || std::string(address).empty()) {
+          return crow::response(400, "Missing required query param: address");
+        }
+
+        try {
+          const DerivedState state =
+              State::deriveFromChainOrThrow(blockchain_.getChain());
+          const std::set<std::string> assets =
+              State::getAssets(state, std::string(address));
+
+          crow::json::wvalue res;
+          std::vector<crow::json::wvalue> assetList;
+          for (const auto &assetId : assets) {
+            assetList.push_back(assetId);
+          }
+          res["address"] = std::string(address);
+          res["assets"] = std::move(assetList);
+          return crow::response(200, res);
+        } catch (const std::exception &e) {
+          return crow::response(500, e.what());
+        }
+      });
 
   CROW_ROUTE(app_, "/pool")([this]() {
     crow::json::wvalue res;
@@ -66,6 +225,12 @@ void Router::registerRoutes() {
 
           auto txn = TxnFactory::createTxn(body);
           wallet_.signTxn(*txn);
+
+          const StateValidationResult stateResult = State::validatePoolAdmission(
+              txn, blockchain_.getChain(), pool_.getTxn());
+          if (!stateResult.ok) {
+            return crow::response(400, stateResult.error);
+          }
 
           if (!pool_.addTxn(txn)) {
             return crow::response(400, "Invalid transaction");

@@ -1,5 +1,6 @@
 #include "chain.h"
 #include "block.h"
+#include "core/State.h"
 #include <cstdlib>
 #include <string>
 #include <stdexcept>
@@ -21,6 +22,10 @@ Block Blockchain::addBlock(const std::vector<std::shared_ptr<Txn>> txns) {
 
 bool Blockchain::addBlock(const Block &block) {
   std::lock_guard<std::mutex> lock(chainMutex);
+  StateValidationResult stateResult = State::validateBlockAppend(block, chain);
+  if (!stateResult.ok) {
+    return false;
+  }
   if (!isValidBlock(block, getLatestBlock())) {
     return false;
   }
@@ -59,6 +64,27 @@ bool Blockchain::isValidBlock(const Block &block, const Block &previousBlock) {
 }
 
 const Block &Blockchain::getLatestBlock() { return chain.back(); }
+
+bool Blockchain::findTransactionInChain(const std::vector<Block> &sourceChain,
+                                        const std::string &txId,
+                                        size_t &outBlockIndex,
+                                        std::shared_ptr<Txn> &outTxn) {
+  if (txId.empty()) {
+    return false;
+  }
+
+  for (size_t i = 0; i < sourceChain.size(); ++i) {
+    for (const auto &txn : sourceChain[i].getTransactions()) {
+      if (txn && txn->id == txId) {
+        outBlockIndex = i;
+        outTxn = txn;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
 
 bool Blockchain::isValidBlockchain(const std::vector<Block> &newchain) {
   if (newchain.empty()) {
@@ -99,6 +125,11 @@ bool Blockchain::replaceBlockchain(const std::vector<Block> &newchain) {
   }
   if (!isValidBlockchain(newchain)) {
     throw std::invalid_argument("Received chain is invalid.");
+    return false;
+  }
+  StateValidationResult stateResult = State::validateFullChain(newchain);
+  if (!stateResult.ok) {
+    throw std::invalid_argument("Received chain has invalid state transitions.");
     return false;
   }
   chain = newchain;

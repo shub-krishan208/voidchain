@@ -3,6 +3,7 @@
 #include "../src/core/TxnFactory.h"
 #include "../src/models/AssetTxn.h"
 #include "../src/models/CurrencyTxn.h"
+#include "../src/miner.h"
 #include "../src/p2p_server.h"
 #include "../src/wallet.h"
 #include <crow/json.h>
@@ -34,6 +35,8 @@ TEST_F(P2pServerTest, AcceptsValidIncomingTransactionMessage) {
   TxnPool pool;
   Wallet wallet;
   P2pServer p2p;
+  Miner miner(blockchain, pool, wallet);
+  miner.mine();
 
   auto txn = makeSignedCurrencyTxn(wallet, "bob", 14.0);
   std::string msg = P2pServer::makeTransactionMessage(*txn);
@@ -61,13 +64,11 @@ TEST_F(P2pServerTest, AcceptsLongerValidIncomingChainMessage) {
   Blockchain localChain;
   Blockchain remoteChain;
   TxnPool pool;
-  Wallet wallet;
   P2pServer p2p;
 
-  auto tx1 = makeSignedCurrencyTxn(wallet, "bob", 3.0);
-  auto tx2 = makeSignedCurrencyTxn(wallet, "charlie", 4.0);
-  remoteChain.addBlock({tx1});
-  remoteChain.addBlock({tx2});
+  std::vector<std::shared_ptr<Txn>> emptyTxs;
+  remoteChain.addBlock(emptyTxs);
+  remoteChain.addBlock(emptyTxs);
 
   std::string msg = P2pServer::makeChainMessage(remoteChain);
   EXPECT_TRUE(p2p.onPeerMessage(msg, localChain, pool));
@@ -99,6 +100,11 @@ TEST_F(P2pServerTest, AcceptsIncomingBlockAndClearsMinedPoolTransactions) {
   TxnPool pool;
   Wallet wallet;
   P2pServer p2p;
+  Miner localMiner(localChain, pool, wallet);
+  localMiner.mine();
+
+  // align remote chain tip with local tip before adding new block
+  ASSERT_TRUE(remoteChain.replaceBlockchain(localChain.getChain()));
 
   auto tx1 = makeSignedCurrencyTxn(wallet, "bob", 11.0);
   ASSERT_TRUE(pool.addTxn(tx1));
@@ -109,6 +115,6 @@ TEST_F(P2pServerTest, AcceptsIncomingBlockAndClearsMinedPoolTransactions) {
   std::string msg = P2pServer::makeBlockMessage(remoteBlock);
 
   EXPECT_TRUE(p2p.onPeerMessage(msg, localChain, pool));
-  EXPECT_EQ(localChain.getChain().size(), 2u);
+  EXPECT_EQ(localChain.getChain().size(), 3u);
   EXPECT_TRUE(pool.getTxn().empty());
 }

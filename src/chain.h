@@ -16,6 +16,10 @@ public:
   Block addBlock(const std::vector<std::shared_ptr<Txn>> txns);
   bool addBlock(const Block &block);
   const Block &getLatestBlock(); // outputs the block at the last of the chain
+  static bool findTransactionInChain(const std::vector<Block> &sourceChain,
+                                     const std::string &txId,
+                                     size_t &outBlockIndex,
+                                     std::shared_ptr<Txn> &outTxn);
   static bool isValidBlock(const Block &block, const Block &previousBlock);
   static bool isValidBlockchain(const std::vector<Block> &newchain);
   bool replaceBlockchain(const std::vector<Block> &newBlockchain);

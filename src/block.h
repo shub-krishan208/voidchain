@@ -27,6 +27,9 @@ public:
   const std::string &getLastHash() const { return lastHash; };
   const std::string &getHash() const { return hash; };
   const std::string &getMerkleRoot() const { return merkleRoot; };
+  const std::vector<std::shared_ptr<Txn>> &getTransactions() const {
+    return transactions;
+  };
   int getNonce() const { return nonce; };
   int getDifficulty() const { return difficulty; };
   static Block genesis();
@@ -38,6 +41,7 @@ public:
                                const int difficulty);
   static int adjustDifficulty(const Block &lastBlock, int64_t currentTime);
 
+  crow::json::wvalue headerToJson() const;
   crow::json::wvalue toJson() const;
   static Block fromJson(const crow::json::rvalue &json);
 

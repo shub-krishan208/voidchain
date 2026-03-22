@@ -77,16 +77,20 @@ int Block::adjustDifficulty(const Block &lastBlock, int64_t currentTime) {
   return std::max(1, lastBlock.getDifficulty() - 1);
 }
 
+crow::json::wvalue Block::headerToJson() const {
+  crow::json::wvalue header;
+  header["timestamp"] = timestamp;
+  header["last_hash"] = lastHash;
+  header["hash"] = hash;
+  header["merkle_root"] = merkleRoot;
+  header["nonce"] = nonce;
+  header["difficulty"] = difficulty;
+  return header;
+}
+
 crow::json::wvalue Block::toJson() const {
 
-  crow::json::wvalue json;
-
-  json["timestamp"] = timestamp;
-  json["last_hash"] = lastHash;
-  json["hash"] = hash;
-  json["merkle_root"] = merkleRoot;
-  json["nonce"] = nonce;
-  json["difficulty"] = difficulty;
+  crow::json::wvalue json = headerToJson();
 
   std::vector<crow::json::wvalue> txList;
 

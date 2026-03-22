@@ -128,36 +128,18 @@ TEST(BlockchainTest, InvalidateBlockchain) {
 
 TEST(BlockchainTest, ReplaceValidBlockchain) {
     Blockchain chain;
+    std::vector<std::shared_ptr<Txn>> emptyTxs;
+    chain.addBlock(emptyTxs);
+    chain.addBlock(emptyTxs);
 
-      auto tx1 = std::make_shared<CurrencyTxn>();
-  tx1->id = "tx001";
-  tx1->from = "alice";
-  tx1->to = "bob";
-  tx1->amount = 50.0;
-  tx1->signature = "sig_alice_001";
-
-  auto tx2 = std::make_shared<CurrencyTxn>();
-  tx2->id = "tx002";
-  tx2->from = "bob";
-  tx2->to = "charlie";
-  tx2->amount = 25.0;
-  tx2->signature = "sig_bob_002";
-
-  std::vector<std::shared_ptr<Txn>> txns = {tx1};
-
-
-    chain.addBlock(txns);
-    txns.push_back(tx2);
-    chain.addBlock(txns);
-    
-    // newBlockchain must be LONGER than chain for replaceBlockchain to accept it
+    // newBlockchain must be longer than chain for replaceBlockchain to accept it
     Blockchain newBlockchain;
-    newBlockchain.addBlock(txns);
-    txns.push_back(tx2);
-    newBlockchain.addBlock(txns);
-    newBlockchain.addBlock(txns); // 4th block makes it longer than chain (3 blocks)
+    newBlockchain.addBlock(emptyTxs);
+    newBlockchain.addBlock(emptyTxs);
+    newBlockchain.addBlock(emptyTxs); // 4 blocks total including genesis
 
-    chain.replaceBlockchain(newBlockchain.getChain());
+    EXPECT_NO_THROW(chain.replaceBlockchain(newBlockchain.getChain()));
+    EXPECT_EQ(chain.getChain().size(), newBlockchain.getChain().size());
 }
 
 TEST(BlockchainTest, RejectInvalidChainReplacement) {

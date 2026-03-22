@@ -58,8 +58,13 @@ TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
   Wallet wallet;
   Miner miner(blockchain, pool, wallet);
 
+  // fund sender before spending
+  Block fundingBlock = miner.mine();
+  (void)fundingBlock;
+
   auto tx1 = makeSignedCurrencyTxn(wallet, "bob", 10.0);
-  auto tx2 = makeSignedAssetTxn(wallet, "charlie", "item-77", "epic");
+  // unowned assets must be self-claimed first
+  auto tx2 = makeSignedAssetTxn(wallet, wallet.getAddressPem(), "item-77", "epic");
 
   ASSERT_TRUE(pool.addTxn(tx1));
   ASSERT_TRUE(pool.addTxn(tx2));
@@ -68,7 +73,7 @@ TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
   std::string previousHash = blockchain.getLatestBlock().getHash();
   Block mined = miner.mine();
 
-  EXPECT_EQ(blockchain.getChain().size(), 2u);
+  EXPECT_EQ(blockchain.getChain().size(), 3u);
   EXPECT_EQ(mined.getLastHash(), previousHash);
   EXPECT_TRUE(pool.getTxn().empty());
 

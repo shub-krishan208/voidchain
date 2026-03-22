@@ -26,6 +26,12 @@ bool TxnPool::verifyTxn(const std::shared_ptr<Txn> &txn) const {
     return false;
   if (pool_.find(txn->id) != pool_.end())
     return false;
+  return verifyTxnSignatureAndFormat(txn);
+}
+
+bool TxnPool::verifyTxnSignatureAndFormat(const std::shared_ptr<Txn> &txn) {
+  if (!txn)
+    return false;
   if (txn->id.empty())
     return false;
 

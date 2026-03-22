@@ -9,6 +9,7 @@
 class TxnPool {
 public:
   bool addTxn(std::shared_ptr<Txn> txn);
+  static bool verifyTxnSignatureAndFormat(const std::shared_ptr<Txn> &txn);
 
   std::vector<std::shared_ptr<Txn>> getTxn() const;
 

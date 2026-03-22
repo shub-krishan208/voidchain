@@ -1,5 +1,6 @@
 #include "p2p_server.h"
 #include "TxnPool.h"
+#include "core/State.h"
 #include "core/TxnFactory.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -90,6 +91,11 @@ bool P2pServer::processMessage(const std::string &data, Blockchain &blockchain,
       }
 
       try {
+        StateValidationResult chainStateResult =
+            State::validateFullChain(incomingChain);
+        if (!chainStateResult.ok) {
+          return false;
+        }
         return blockchain.replaceBlockchain(incomingChain);
       } catch (const std::exception &) {
         return false;
@@ -103,6 +109,11 @@ bool P2pServer::processMessage(const std::string &data, Blockchain &blockchain,
       std::string txStr = crow::json::wvalue(msg["data"]).dump();
       nlohmann::json txJson = nlohmann::json::parse(txStr);
       auto txn = TxnFactory::createTxn(txJson);
+      StateValidationResult txStateResult = State::validatePoolAdmission(
+          txn, blockchain.getChain(), pool.getTxn());
+      if (!txStateResult.ok) {
+        return false;
+      }
       return pool.addTxn(txn);
     }
 
@@ -112,6 +123,11 @@ bool P2pServer::processMessage(const std::string &data, Blockchain &blockchain,
       }
 
       Block block = Block::fromJson(msg["data"]);
+      StateValidationResult blockStateResult =
+          State::validateBlockAppend(block, blockchain.getChain());
+      if (!blockStateResult.ok) {
+        return false;
+      }
       if (!blockchain.addBlock(block)) {
         return false;
       }

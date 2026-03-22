@@ -23,6 +23,7 @@ add_library(voidchain_core
     src/network/PeerClient.cpp
     src/utils/hashing.cpp
     src/core/TxnFactory.cpp
+    src/core/State.cpp
     src/models/CurrencyTxn.cpp
     src/models/AssetTxn.cpp
 )
@@ -39,6 +40,9 @@ target_link_libraries(voidchain_core PUBLIC
 
 add_executable(voidchain src/main.cpp)
 target_link_libraries(voidchain PRIVATE voidchain_core)
+
+add_executable(citizen_client scripts/citizen_client.cpp)
+target_link_libraries(citizen_client PRIVATE voidchain_core)
 
 option(BUILD_TESTING "Build Tests" ON)
 
