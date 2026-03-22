@@ -38,7 +38,8 @@ int main() {
   TxnPool pool;
   Miner miner(blockchain, pool, wallet);
 
-  crow::SimpleApp app;
+  crow::App<CorsMiddleware> app;
+
   P2pServer p2p;
 
   PeerClient peerClient(

@@ -19,4 +19,6 @@ public:
 
   static EVP_PKEY *extractPublicKey(const EVP_PKEY *keypair);
   static std::string publicKeyToPEM(EVP_PKEY *publicKey);
+  static std::string privateKeyToHex(EVP_PKEY *keyPair);
+  static EVP_PKEY *keyPairFromPrivateHex(const std::string &privateHex);
 };

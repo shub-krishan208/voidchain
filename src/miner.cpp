@@ -10,7 +10,7 @@
 Miner::Miner(Blockchain &chain, TxnPool &pool, Wallet &wallet)
     : chain_(chain), pool_(pool), wallet_(wallet) {}
 
-Block Miner::mine() {
+Block Miner::mine(const std::string &minerAddress) {
   auto pendingTxns = pool_.getTxn();
   std::vector<std::shared_ptr<Txn>> acceptedTxns;
   acceptedTxns.reserve(pendingTxns.size());
@@ -26,7 +26,7 @@ Block Miner::mine() {
   auto rewardTxn = std::make_shared<CurrencyTxn>();
   rewardTxn->id = generateUUID();
   rewardTxn->from = "COINBASE";
-  rewardTxn->to = wallet_.getAddressPem();
+  rewardTxn->to = minerAddress.empty() ? wallet_.getAddressPem() : minerAddress;
   rewardTxn->amount = MINING_REWARD;
   rewardTxn->signature = "COINBASE";
 

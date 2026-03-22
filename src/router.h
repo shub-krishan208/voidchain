@@ -1,6 +1,7 @@
 #ifndef VOID_ROUTER_H
 #define VOID_ROUTER_H
 
+#include "CorsMiddleware.h"
 #include <crow.h>
 
 class Blockchain;
@@ -12,7 +13,7 @@ class PeerClient;
 
 class Router {
 public:
-    Router(crow::SimpleApp& app, Blockchain& blockchain, Wallet& wallet,
+    Router(crow::App<CorsMiddleware>& app, Blockchain& blockchain, Wallet& wallet,
            TxnPool& pool, Miner& miner, P2pServer& p2p, PeerClient& peerClient);
     void registerRoutes();
 
@@ -23,7 +24,7 @@ private:
     Miner& miner_;
     P2pServer& p2p_;
     PeerClient& peerClient_;
-    crow::SimpleApp& app_;
+    crow::App<CorsMiddleware>& app_;
 };
 
 #endif // VOID_ROUTER_H
