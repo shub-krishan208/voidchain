@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VoidChain UI
 
-## Getting Started
+Dark-only cyberpunk web UI for VoidChain with:
 
-First, run the development server:
+- Blocks explorer (`/blocks`)
+- Mempool monitor (`/mempool`)
+- Mining console (`/mining`)
+- Passkey wallet connect + wallet dashboard (`/wallet`)
+- Asset minting/transfer flow (`/minting`)
+
+## Runtime Architecture
+
+- Frontend: Next.js App Router
+- BFF layer: `app/api/voidchain/[...path]/route.ts`
+- Upstream: VoidChain node HTTP API (see `mds/website_backend_integration_helper.md`)
+- Auth model: non-custodial passkey unlock for locally encrypted wallet secret key
+
+## Environment
+
+Copy `.env.example` to `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Important variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `VOIDCHAIN_API_URL`: upstream VoidChain node URL for server-side proxying.
+- fallback if omitted: `http://localhost:4040`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Local Development
 
-## Learn More
+From `voidchain-ui`:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+bun install
+bun run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Visit [http://localhost:3000](http://localhost:3000).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Local Node Setup Reminder
 
-## Deploy on Vercel
+VoidChain backend in this repository currently defaults to port `4040` via root `/.env` (`PORT=4040`), even though source fallback in `src/main.cpp` is `18169` if `PORT` is missing.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To keep frontend + backend aligned during local runs, use:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `VOIDCHAIN_API_URL=http://localhost:4040`
+
+## Security Notes
+
+- This project never persists raw wallet secret keys on the Next.js server.
+- `secretKey` is stored client-side only, encrypted in local storage and unlocked by passkey verification.
+- Production deployment should enforce HTTPS and avoid logging request bodies.
