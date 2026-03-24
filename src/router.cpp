@@ -18,7 +18,9 @@
 #include <crow/json.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -28,6 +30,8 @@
 
 namespace {
 constexpr size_t kDefaultRecentTxCount = 20;
+constexpr const char *kPemBeginMarker = "-----BEGIN PUBLIC KEY-----";
+constexpr const char *kPemEndMarker = "-----END PUBLIC KEY-----";
 
 std::string deriveAddressPem(EVP_PKEY *keyPair) {
   if (!keyPair) {
@@ -94,7 +98,42 @@ std::string normalizeAddress(std::string value) {
     --end;
   }
 
-  return normalized.substr(start, end - start);
+  const std::string trimmed = normalized.substr(start, end - start);
+  const size_t beginPos = trimmed.find(kPemBeginMarker);
+  if (beginPos == std::string::npos) {
+    return trimmed;
+  }
+
+  const size_t bodyStart = beginPos + std::strlen(kPemBeginMarker);
+  const size_t endPos = trimmed.find(kPemEndMarker, bodyStart);
+  if (endPos == std::string::npos || endPos <= bodyStart) {
+    return trimmed;
+  }
+
+  std::string compactBody;
+  compactBody.reserve(endPos - bodyStart);
+  for (size_t i = bodyStart; i < endPos; ++i) {
+    if (std::isspace(static_cast<unsigned char>(trimmed[i])) == 0) {
+      compactBody.push_back(trimmed[i]);
+    }
+  }
+
+  if (compactBody.empty()) {
+    return trimmed;
+  }
+
+  std::string canonical;
+  canonical.reserve(
+      std::strlen(kPemBeginMarker) + std::strlen(kPemEndMarker) +
+      compactBody.size() + (compactBody.size() / 64) + 8);
+  canonical += kPemBeginMarker;
+  canonical.push_back('\n');
+  for (size_t i = 0; i < compactBody.size(); i += 64) {
+    canonical.append(compactBody, i, std::min<size_t>(64, compactBody.size() - i));
+    canonical.push_back('\n');
+  }
+  canonical += kPemEndMarker;
+  return canonical;
 }
 
 bool transactionTouchesAddress(const std::shared_ptr<Txn> &txn,

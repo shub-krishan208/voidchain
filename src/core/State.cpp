@@ -2,12 +2,16 @@
 #include "../TxnPool.h"
 #include "../models/AssetTxn.h"
 #include "../models/CurrencyTxn.h"
+#include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 #include <stdexcept>
 
 namespace {
 constexpr double kFloatEpsilon = 1e-9;
+constexpr const char *kPemBeginMarker = "-----BEGIN PUBLIC KEY-----";
+constexpr const char *kPemEndMarker = "-----END PUBLIC KEY-----";
 
 std::string normalizeAddress(std::string value) {
   std::string normalized;
@@ -59,7 +63,42 @@ std::string normalizeAddress(std::string value) {
     --end;
   }
 
-  return normalized.substr(start, end - start);
+  const std::string trimmed = normalized.substr(start, end - start);
+  const size_t beginPos = trimmed.find(kPemBeginMarker);
+  if (beginPos == std::string::npos) {
+    return trimmed;
+  }
+
+  const size_t bodyStart = beginPos + std::strlen(kPemBeginMarker);
+  const size_t endPos = trimmed.find(kPemEndMarker, bodyStart);
+  if (endPos == std::string::npos || endPos <= bodyStart) {
+    return trimmed;
+  }
+
+  std::string compactBody;
+  compactBody.reserve(endPos - bodyStart);
+  for (size_t i = bodyStart; i < endPos; ++i) {
+    if (std::isspace(static_cast<unsigned char>(trimmed[i])) == 0) {
+      compactBody.push_back(trimmed[i]);
+    }
+  }
+
+  if (compactBody.empty()) {
+    return trimmed;
+  }
+
+  std::string canonical;
+  canonical.reserve(
+      std::strlen(kPemBeginMarker) + std::strlen(kPemEndMarker) +
+      compactBody.size() + (compactBody.size() / 64) + 8);
+  canonical += kPemBeginMarker;
+  canonical.push_back('\n');
+  for (size_t i = 0; i < compactBody.size(); i += 64) {
+    canonical.append(compactBody, i, std::min<size_t>(64, compactBody.size() - i));
+    canonical.push_back('\n');
+  }
+  canonical += kPemEndMarker;
+  return canonical;
 }
 }
 

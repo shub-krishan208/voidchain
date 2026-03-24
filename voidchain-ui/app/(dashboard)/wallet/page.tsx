@@ -22,12 +22,29 @@ function shortAddress(value: string) {
 }
 
 function normalizeAddressInput(value: string) {
-  return value
+  const normalized = value
     .replaceAll("\\r\\n", "\n")
     .replaceAll("\\n", "\n")
     .replaceAll("\r\n", "\n")
     .replaceAll("\r", "\n")
     .trim();
+
+  const begin = "-----BEGIN PUBLIC KEY-----";
+  const end = "-----END PUBLIC KEY-----";
+  const beginPos = normalized.indexOf(begin);
+  const endPos = normalized.indexOf(end, beginPos + begin.length);
+  if (beginPos === -1 || endPos === -1 || endPos <= beginPos) {
+    return normalized;
+  }
+
+  const bodyRaw = normalized.slice(beginPos + begin.length, endPos);
+  const body = bodyRaw.replace(/\s+/g, "");
+  if (!body) {
+    return normalized;
+  }
+
+  const lines = body.match(/.{1,64}/g) || [];
+  return `${begin}\n${lines.join("\n")}\n${end}`;
 }
 
 export default function WalletPage() {
