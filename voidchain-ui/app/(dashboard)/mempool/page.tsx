@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { JsonPreview } from "@/components/ui/json-preview";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/ui/section-header";
+import { TransactionItem } from "@/components/ui/transaction-item";
 import { useToast } from "@/components/providers/toast-provider";
 import { voidchainClient } from "@/lib/voidchain/client";
 import type { VoidchainTransaction } from "@/lib/voidchain/types";
@@ -12,7 +14,9 @@ import type { VoidchainTransaction } from "@/lib/voidchain/types";
 export default function MempoolPage() {
   const { pushToast } = useToast();
   const [isLoading, setIsLoading] = React.useState(true);
-  const [transactions, setTransactions] = React.useState<VoidchainTransaction[]>([]);
+  const [transactions, setTransactions] = React.useState<
+    VoidchainTransaction[]
+  >([]);
 
   const refresh = React.useCallback(async () => {
     setIsLoading(true);
@@ -36,6 +40,11 @@ export default function MempoolPage() {
     return () => clearInterval(handle);
   }, [refresh]);
 
+  const currencyCount = transactions.filter(
+    (t) => t.type === "CURRENCY",
+  ).length;
+  const assetCount = transactions.filter((t) => t.type === "ASSET").length;
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -49,13 +58,39 @@ export default function MempoolPage() {
       </div>
 
       <Card>
-        <CardTitle>Pending Transactions</CardTitle>
-        <CardDescription>
-          {isLoading
-            ? "Loading mempool..."
-            : `Current mempool size: ${transactions.length}`}
-        </CardDescription>
-        <JsonPreview className="mt-4" data={transactions} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>Pending Transactions</CardTitle>
+            <CardDescription>
+              {isLoading
+                ? "Loading mempool..."
+                : `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""} in pool`}
+            </CardDescription>
+          </div>
+          {!isLoading && transactions.length > 0 ? (
+            <div className="flex items-center gap-2">
+              {currencyCount > 0 ? (
+                <Badge variant="success">{currencyCount} currency</Badge>
+              ) : null}
+              {assetCount > 0 ? (
+                <Badge variant="default">{assetCount} asset</Badge>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {isLoading ? null : transactions.length === 0 ? (
+          <EmptyState
+            className="mt-4"
+            message="Mempool is empty — no pending transactions."
+          />
+        ) : (
+          <div className="mt-4 space-y-2">
+            {transactions.map((tx) => (
+              <TransactionItem key={tx.id} tx={tx} />
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

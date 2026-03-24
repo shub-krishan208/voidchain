@@ -4,12 +4,16 @@ import * as React from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { useToast } from "@/components/providers/toast-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { DataField, DataFieldGroup } from "@/components/ui/data-field";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { JsonPreview } from "@/components/ui/json-preview";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Textarea } from "@/components/ui/textarea";
+import { TransactionItem } from "@/components/ui/transaction-item";
+import { truncateAddress } from "@/lib/format";
 import { voidchainClient } from "@/lib/voidchain/client";
 import type { OwnerResponse, TransactResponse } from "@/lib/voidchain/types";
 
@@ -24,7 +28,9 @@ export default function MintingPage() {
   const [transferTo, setTransferTo] = React.useState("");
   const [ownerLookupId, setOwnerLookupId] = React.useState("");
   const [ownerInfo, setOwnerInfo] = React.useState<OwnerResponse | null>(null);
-  const [lastResult, setLastResult] = React.useState<TransactResponse | null>(null);
+  const [lastResult, setLastResult] = React.useState<TransactResponse | null>(
+    null,
+  );
 
   const ensureWallet = React.useCallback(() => {
     if (!wallet) {
@@ -41,10 +47,17 @@ export default function MintingPage() {
       />
 
       <Card>
-        <CardTitle>Connected Wallet</CardTitle>
-        <CardDescription>
-          {wallet ? wallet.address : "No wallet connected. Open Wallet tab first."}
-        </CardDescription>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle>Connected Wallet</CardTitle>
+            <CardDescription>
+              {wallet
+                ? truncateAddress(wallet.address, 16, 10)
+                : "No wallet connected. Open Wallet tab first."}
+            </CardDescription>
+          </div>
+          {wallet ? <Badge variant="success">Connected</Badge> : null}
+        </div>
       </Card>
 
       <Tabs.Root defaultValue="mint" className="space-y-4">
@@ -108,7 +121,9 @@ export default function MintingPage() {
                     pushToast({
                       title: "Mint failed",
                       description:
-                        error instanceof Error ? error.message : "Unknown error",
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown error",
                       variant: "danger",
                     });
                   }
@@ -156,7 +171,8 @@ export default function MintingPage() {
                     setLastResult(result as TransactResponse);
                     pushToast({
                       title: "Transfer submitted",
-                      description: "Asset transfer transaction sent to mempool.",
+                      description:
+                        "Asset transfer transaction sent to mempool.",
                     });
                     setTransferTo("");
                     setTransferItemId("");
@@ -165,7 +181,9 @@ export default function MintingPage() {
                     pushToast({
                       title: "Transfer failed",
                       description:
-                        error instanceof Error ? error.message : "Unknown error",
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown error",
                       variant: "danger",
                     });
                   }
@@ -180,7 +198,9 @@ export default function MintingPage() {
         <Tabs.Content value="owner">
           <Card>
             <CardTitle>Owner Lookup</CardTitle>
-            <CardDescription>Resolve current owner for an itemId.</CardDescription>
+            <CardDescription>
+              Resolve current owner for an itemId.
+            </CardDescription>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <Input
                 placeholder="Item ID"
@@ -190,14 +210,18 @@ export default function MintingPage() {
               <Button
                 onClick={async () => {
                   try {
-                    const result = await voidchainClient.owner(ownerLookupId.trim());
+                    const result = await voidchainClient.owner(
+                      ownerLookupId.trim(),
+                    );
                     setOwnerInfo(result);
                   } catch (error) {
                     setOwnerInfo(null);
                     pushToast({
                       title: "Owner lookup failed",
                       description:
-                        error instanceof Error ? error.message : "Unknown error",
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown error",
                       variant: "danger",
                     });
                   }
@@ -206,15 +230,44 @@ export default function MintingPage() {
                 Lookup
               </Button>
             </div>
-            <JsonPreview className="mt-4" data={ownerInfo || { status: "idle" }} />
+
+            {ownerInfo ? (
+              <DataFieldGroup className="mt-4">
+                <DataField label="Item ID" value={ownerInfo.itemId} mono />
+                <DataField
+                  label="Owner"
+                  value={truncateAddress(ownerInfo.owner, 16, 10)}
+                  mono
+                />
+              </DataFieldGroup>
+            ) : (
+              <div className="mt-4 rounded-lg border border-dashed border-border/60 py-6 text-center text-sm text-muted-2">
+                Enter an item ID to look up its owner.
+              </div>
+            )}
           </Card>
         </Tabs.Content>
       </Tabs.Root>
 
       <Card>
         <CardTitle>Last Asset Transaction Result</CardTitle>
-        <CardDescription>Server response for your last mint/transfer submission.</CardDescription>
-        <JsonPreview className="mt-4" data={lastResult || { status: "idle" }} />
+        <CardDescription>
+          Server response for your last mint/transfer submission.
+        </CardDescription>
+
+        {lastResult ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium text-success">
+              {lastResult.message}
+            </p>
+            <TransactionItem tx={lastResult.transaction} />
+          </div>
+        ) : (
+          <EmptyState
+            className="mt-4"
+            message="No mint or transfer submitted yet."
+          />
+        )}
       </Card>
     </div>
   );

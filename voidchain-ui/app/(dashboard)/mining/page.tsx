@@ -4,11 +4,14 @@ import * as React from "react";
 import { useMining } from "@/components/providers/mining-provider";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { useToast } from "@/components/providers/toast-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { DataField, DataFieldGroup } from "@/components/ui/data-field";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { JsonPreview } from "@/components/ui/json-preview";
 import { SectionHeader } from "@/components/ui/section-header";
+import { truncateHash, formatTimestamp } from "@/lib/format";
 import { voidchainClient } from "@/lib/voidchain/client";
 
 function normalizeAddressInput(value: string) {
@@ -65,6 +68,10 @@ export default function MiningPage() {
     refreshHealth();
   }, [refreshHealth]);
 
+  const isHealthy =
+    healthStatus.toLowerCase() === "ok" ||
+    healthStatus.toLowerCase() === "healthy";
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -73,8 +80,15 @@ export default function MiningPage() {
       />
 
       <Card>
-        <CardTitle>Node Health</CardTitle>
-        <CardDescription>Status: {healthStatus}</CardDescription>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle>Node Health</CardTitle>
+            <CardDescription>Current node status</CardDescription>
+          </div>
+          <Badge variant={isHealthy ? "success" : "danger"}>
+            {healthStatus}
+          </Badge>
+        </div>
       </Card>
 
       <Card>
@@ -132,19 +146,111 @@ export default function MiningPage() {
       <Card>
         <CardTitle>Mining Result</CardTitle>
         <CardDescription>Last mined block payload.</CardDescription>
-        <JsonPreview
-          className="mt-4"
-          data={latestMineResult || { status: "idle" }}
-        />
+
+        {latestMineResult ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-sm font-medium text-success">
+              {latestMineResult.message}
+            </p>
+            <DataFieldGroup>
+              <DataField
+                label="Hash"
+                value={truncateHash(
+                  latestMineResult.new_block.hash,
+                  14,
+                  10,
+                )}
+                mono
+              />
+              <DataField
+                label="Previous"
+                value={truncateHash(
+                  latestMineResult.new_block.last_hash,
+                  14,
+                  10,
+                )}
+                mono
+              />
+              <DataField
+                label="Merkle Root"
+                value={truncateHash(
+                  latestMineResult.new_block.merkle_root,
+                  14,
+                  10,
+                )}
+                mono
+              />
+              <DataField
+                label="Nonce"
+                value={latestMineResult.new_block.nonce.toLocaleString()}
+              />
+              <DataField
+                label="Difficulty"
+                value={latestMineResult.new_block.difficulty}
+              />
+              <DataField
+                label="Transactions"
+                value={latestMineResult.new_block.transactions.length}
+              />
+              <DataField
+                label="Timestamp"
+                value={formatTimestamp(latestMineResult.new_block.timestamp)}
+              />
+            </DataFieldGroup>
+          </div>
+        ) : (
+          <EmptyState
+            className="mt-4"
+            message="No blocks mined yet this session."
+          />
+        )}
       </Card>
 
       <Card>
         <CardTitle>Mining History</CardTitle>
-        <CardDescription>Session history, newest mined block first.</CardDescription>
-        <JsonPreview
-          className="mt-4"
-          data={miningHistory.length > 0 ? miningHistory : { status: "idle" }}
-        />
+        <CardDescription>
+          Session history, newest mined block first.
+        </CardDescription>
+
+        {miningHistory.length > 0 ? (
+          <div className="mt-4 space-y-2">
+            {miningHistory.map((result, i) => (
+              <div
+                key={`${result.new_block.hash}-${i}`}
+                className="flex items-center gap-4 rounded-lg border border-border/50 bg-surface-2/40 px-4 py-3"
+              >
+                <span className="text-lg font-bold text-primary-strong">
+                  #{miningHistory.length - i}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="truncate font-mono text-xs text-muted"
+                    title={result.new_block.hash}
+                  >
+                    {truncateHash(result.new_block.hash)}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-2">
+                    <span>
+                      {result.new_block.transactions.length} txn
+                      {result.new_block.transactions.length !== 1 ? "s" : ""}
+                    </span>
+                    <span>&middot;</span>
+                    <span>Diff {result.new_block.difficulty}</span>
+                    <span>&middot;</span>
+                    <span>
+                      {formatTimestamp(result.new_block.timestamp)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            className="mt-4"
+            message="No mining history this session."
+          />
+        )}
       </Card>
     </div>
   );

@@ -7,19 +7,14 @@ import { useWallet } from "@/components/providers/wallet-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { JsonPreview } from "@/components/ui/json-preview";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Textarea } from "@/components/ui/textarea";
+import { TransactionItem } from "@/components/ui/transaction-item";
+import { truncateAddress, formatAmount } from "@/lib/format";
 import { voidchainClient } from "@/lib/voidchain/client";
 import type { TransactionsResponse, WalletInfo } from "@/lib/voidchain/types";
-
-function shortAddress(value: string) {
-  if (value.length < 24) {
-    return value;
-  }
-  return `${value.slice(0, 14)}...${value.slice(-10)}`;
-}
 
 function normalizeAddressInput(value: string) {
   const normalized = value
@@ -66,7 +61,8 @@ export default function WalletPage() {
   const [isBusy, setIsBusy] = React.useState(false);
   const [showSecret, setShowSecret] = React.useState<string | null>(null);
   const [walletInfo, setWalletInfo] = React.useState<WalletInfo | null>(null);
-  const [txHistory, setTxHistory] = React.useState<TransactionsResponse | null>(null);
+  const [txHistory, setTxHistory] =
+    React.useState<TransactionsResponse | null>(null);
 
   const [sendTo, setSendTo] = React.useState("");
   const [sendAmount, setSendAmount] = React.useState("1");
@@ -108,9 +104,9 @@ export default function WalletPage() {
         <CardTitle>Wallet Status</CardTitle>
         <CardDescription>
           {wallet
-            ? `Connected: ${shortAddress(wallet.address)}`
+            ? truncateAddress(wallet.address, 16, 10)
             : hasVault
-              ? `Vault ready: ${shortAddress(storedAddress || "")}`
+              ? `Vault ready: ${truncateAddress(storedAddress || "", 16, 10)}`
               : "No passkey wallet configured yet."}
         </CardDescription>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -126,7 +122,8 @@ export default function WalletPage() {
                   forgetWallet();
                   pushToast({
                     title: "Wallet vault removed",
-                    description: "Stored passkey wallet metadata has been deleted.",
+                    description:
+                      "Stored passkey wallet metadata has been deleted.",
                   });
                 }}
               >
@@ -149,7 +146,9 @@ export default function WalletPage() {
                       pushToast({
                         title: "Unlock failed",
                         description:
-                          error instanceof Error ? error.message : "Unknown error",
+                          error instanceof Error
+                            ? error.message
+                            : "Unknown error",
                         variant: "danger",
                       });
                     } finally {
@@ -183,11 +182,14 @@ export default function WalletPage() {
               onClick={async () => {
                 setIsBusy(true);
                 try {
-                  const next = await createWalletWithPasskey(walletLabel.trim());
+                  const next = await createWalletWithPasskey(
+                    walletLabel.trim(),
+                  );
                   setShowSecret(next.secretKey);
                   pushToast({
                     title: "Wallet created",
-                    description: "Passkey and encrypted vault are now configured.",
+                    description:
+                      "Passkey and encrypted vault are now configured.",
                   });
                   refreshWalletData();
                 } catch (error) {
@@ -223,11 +225,15 @@ export default function WalletPage() {
               onClick={async () => {
                 setIsBusy(true);
                 try {
-                  await recoverWalletWithPasskey(recoverSecret.trim(), walletLabel.trim());
+                  await recoverWalletWithPasskey(
+                    recoverSecret.trim(),
+                    walletLabel.trim(),
+                  );
                   setRecoverSecret("");
                   pushToast({
                     title: "Wallet recovered",
-                    description: "Passkey vault now protects your recovered wallet.",
+                    description:
+                      "Passkey vault now protects your recovered wallet.",
                   });
                   refreshWalletData();
                 } catch (error) {
@@ -311,19 +317,88 @@ export default function WalletPage() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* ── Wallet Snapshot ── */}
         <Card>
           <CardTitle>Wallet Snapshot</CardTitle>
-          <CardDescription>Balance, assets, and recent chain activity.</CardDescription>
-          <JsonPreview className="mt-4" data={walletInfo || { status: "idle" }} />
+          <CardDescription>
+            Balance, assets, and recent chain activity.
+          </CardDescription>
+
+          {walletInfo ? (
+            <div className="mt-4 space-y-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">
+                  {formatAmount(walletInfo.balance)}
+                </span>
+                <span className="text-sm font-medium text-muted">VDC</span>
+              </div>
+
+              {walletInfo.assets.length > 0 ? (
+                <div>
+                  <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-2">
+                    Assets
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {walletInfo.assets.map((asset) => (
+                      <Badge key={asset} variant="default">
+                        {asset}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-2">No assets held.</p>
+              )}
+
+              {walletInfo.recentTransactions.length > 0 ? (
+                <div>
+                  <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-2">
+                    Recent Activity
+                  </h4>
+                  <div className="space-y-2">
+                    {walletInfo.recentTransactions.slice(0, 5).map((tx) => (
+                      <TransactionItem key={tx.txId} tx={tx} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-2">No recent activity.</p>
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              className="mt-4"
+              message="Connect wallet to view snapshot."
+            />
+          )}
         </Card>
+
+        {/* ── Transaction History ── */}
         <Card>
           <CardTitle>Transaction History</CardTitle>
-          <CardDescription>Full transaction list for connected address.</CardDescription>
-          <JsonPreview className="mt-4" data={txHistory || { status: "idle" }} />
+          <CardDescription>
+            Full transaction list for connected address.
+          </CardDescription>
+
+          {txHistory && txHistory.transactions.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {txHistory.transactions.map((tx) => (
+                <TransactionItem key={tx.txId} tx={tx} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              className="mt-4"
+              message="No transaction history yet."
+            />
+          )}
         </Card>
       </div>
 
-      <Dialog.Root open={Boolean(showSecret)} onOpenChange={() => setShowSecret(null)}>
+      <Dialog.Root
+        open={Boolean(showSecret)}
+        onOpenChange={() => setShowSecret(null)}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/70" />
           <Dialog.Content className="fixed left-1/2 top-1/2 w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface-1 p-6 shadow-xl">
@@ -331,8 +406,8 @@ export default function WalletPage() {
               Save your wallet secret key now
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-sm text-muted">
-              This is shown once for backup. You still unlock daily usage with your
-              passkey.
+              This is shown once for backup. You still unlock daily usage with
+              your passkey.
             </Dialog.Description>
             <pre className="mt-4 overflow-auto rounded-md border border-border bg-surface-2 p-3 font-mono text-xs text-foreground">
               {showSecret}
