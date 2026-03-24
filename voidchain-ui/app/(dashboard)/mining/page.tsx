@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useMining } from "@/components/providers/mining-provider";
 import { useWallet } from "@/components/providers/wallet-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { Button } from "@/components/ui/button";
@@ -9,15 +10,15 @@ import { Input } from "@/components/ui/input";
 import { JsonPreview } from "@/components/ui/json-preview";
 import { SectionHeader } from "@/components/ui/section-header";
 import { voidchainClient } from "@/lib/voidchain/client";
-import type { MineResponse } from "@/lib/voidchain/types";
 
 export default function MiningPage() {
   const { wallet } = useWallet();
+  const { miningHistory, addMineResult } = useMining();
   const { pushToast } = useToast();
   const [isMining, setIsMining] = React.useState(false);
   const [minerAddress, setMinerAddress] = React.useState("");
-  const [mineResult, setMineResult] = React.useState<MineResponse | null>(null);
   const [healthStatus, setHealthStatus] = React.useState("unknown");
+  const latestMineResult = miningHistory[0] || null;
 
   React.useEffect(() => {
     if (wallet?.address) {
@@ -70,7 +71,7 @@ export default function MiningPage() {
                   const result = await voidchainClient.mine(
                     minerAddress.trim() || undefined,
                   );
-                  setMineResult(result);
+                  addMineResult(result);
                   pushToast({
                     title: "Block mined",
                     description: "New block appended and broadcasted.",
@@ -105,7 +106,19 @@ export default function MiningPage() {
       <Card>
         <CardTitle>Mining Result</CardTitle>
         <CardDescription>Last mined block payload.</CardDescription>
-        <JsonPreview className="mt-4" data={mineResult || { status: "idle" }} />
+        <JsonPreview
+          className="mt-4"
+          data={latestMineResult || { status: "idle" }}
+        />
+      </Card>
+
+      <Card>
+        <CardTitle>Mining History</CardTitle>
+        <CardDescription>Session history, newest mined block first.</CardDescription>
+        <JsonPreview
+          className="mt-4"
+          data={miningHistory.length > 0 ? miningHistory : { status: "idle" }}
+        />
       </Card>
     </div>
   );

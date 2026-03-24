@@ -13,6 +13,10 @@ type ActiveWallet = {
   secretKey: string;
 };
 
+function normalizeAddress(address: string) {
+  return address.trim();
+}
+
 type WalletContextValue = {
   wallet: ActiveWallet | null;
   hasVault: boolean;
@@ -38,20 +42,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const vault = readVault();
     setHasVault(Boolean(vault));
-    setStoredAddress(vault?.address || null);
+    setStoredAddress(vault?.address ? normalizeAddress(vault.address) : null);
   }, []);
 
   const syncVaultState = React.useCallback(() => {
     const vault = readVault();
     setHasVault(Boolean(vault));
-    setStoredAddress(vault?.address || null);
+    setStoredAddress(vault?.address ? normalizeAddress(vault.address) : null);
   }, []);
 
   const createWalletWithPasskey = React.useCallback(
     async (label?: string) => {
       const materials = await voidchainClient.walletGenerate();
-      await provisionWalletVault(materials.address, materials.secretKey, label);
-      const active = { address: materials.address, secretKey: materials.secretKey };
+      const normalizedAddress = normalizeAddress(materials.address);
+      await provisionWalletVault(normalizedAddress, materials.secretKey, label);
+      const active = {
+        address: normalizedAddress,
+        secretKey: materials.secretKey,
+      };
       setWallet(active);
       syncVaultState();
       return active;
@@ -62,8 +70,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const recoverWalletWithPasskey = React.useCallback(
     async (secretKey: string, label?: string) => {
       const recovered = await voidchainClient.walletRecover(secretKey);
-      await provisionWalletVault(recovered.address, secretKey, label);
-      const active = { address: recovered.address, secretKey };
+      const normalizedAddress = normalizeAddress(recovered.address);
+      await provisionWalletVault(normalizedAddress, secretKey, label);
+      const active = { address: normalizedAddress, secretKey };
       setWallet(active);
       syncVaultState();
       return active;
@@ -73,9 +82,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const connectWithPasskey = React.useCallback(async () => {
     const unlocked = await unlockWalletVault();
-    setWallet(unlocked);
+    const normalized = {
+      ...unlocked,
+      address: normalizeAddress(unlocked.address),
+    };
+    setWallet(normalized);
     syncVaultState();
-    return unlocked;
+    return normalized;
   }, [syncVaultState]);
 
   const disconnect = React.useCallback(() => {

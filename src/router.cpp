@@ -18,10 +18,12 @@
 #include <crow/json.h>
 #include <nlohmann/json.hpp>
 
+#include <cctype>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace {
@@ -108,6 +110,22 @@ collectTransactionsForAddress(const std::vector<Block> &chain,
   }
 
   return out;
+}
+
+std::string trimWhitespace(std::string value) {
+  size_t start = 0;
+  while (start < value.size() &&
+         std::isspace(static_cast<unsigned char>(value[start])) != 0) {
+    ++start;
+  }
+
+  size_t end = value.size();
+  while (end > start &&
+         std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
+    --end;
+  }
+
+  return value.substr(start, end - start);
 }
 } // namespace
 
@@ -282,11 +300,16 @@ void Router::registerRoutes() {
         }
 
         try {
+          const std::string addressStr = trimWhitespace(std::string(address));
+          if (addressStr.empty()) {
+            return crow::response(400, "Missing required query param: address");
+          }
+
           const DerivedState state =
               State::deriveFromChainOrThrow(blockchain_.getChain());
           crow::json::wvalue res;
-          res["address"] = std::string(address);
-          res["balance"] = State::getBalance(state, std::string(address));
+          res["address"] = addressStr;
+          res["balance"] = State::getBalance(state, addressStr);
           return crow::response(200, res);
         } catch (const std::exception &e) {
           return crow::response(500, e.what());
@@ -325,17 +348,21 @@ void Router::registerRoutes() {
         }
 
         try {
+          const std::string addressStr = trimWhitespace(std::string(address));
+          if (addressStr.empty()) {
+            return crow::response(400, "Missing required query param: address");
+          }
+
           const DerivedState state =
               State::deriveFromChainOrThrow(blockchain_.getChain());
-          const std::set<std::string> assets =
-              State::getAssets(state, std::string(address));
+          const std::set<std::string> assets = State::getAssets(state, addressStr);
 
           crow::json::wvalue res;
           std::vector<crow::json::wvalue> assetList;
           for (const auto &assetId : assets) {
             assetList.push_back(assetId);
           }
-          res["address"] = std::string(address);
+          res["address"] = addressStr;
           res["assets"] = std::move(assetList);
           return crow::response(200, res);
         } catch (const std::exception &e) {
@@ -350,6 +377,11 @@ void Router::registerRoutes() {
           return crow::response(400, "Missing required query param: address");
         }
 
+        const std::string addressStr = trimWhitespace(std::string(address));
+        if (addressStr.empty()) {
+          return crow::response(400, "Missing required query param: address");
+        }
+
         std::vector<Block> chainSnapshot;
         {
           std::lock_guard<std::mutex> lock(blockchain_.chainMutex);
@@ -357,9 +389,9 @@ void Router::registerRoutes() {
         }
 
         crow::json::wvalue res;
-        res["address"] = std::string(address);
+        res["address"] = addressStr;
         res["transactions"] =
-            collectTransactionsForAddress(chainSnapshot, std::string(address));
+            collectTransactionsForAddress(chainSnapshot, addressStr);
         return crow::response(200, res);
       });
 
@@ -377,7 +409,11 @@ void Router::registerRoutes() {
             chainSnapshot = blockchain_.getChain();
           }
 
-          const std::string addressStr(address);
+          const std::string addressStr = trimWhitespace(std::string(address));
+          if (addressStr.empty()) {
+            return crow::response(400, "Missing required query param: address");
+          }
+
           const DerivedState state = State::deriveFromChainOrThrow(chainSnapshot);
           const std::set<std::string> assets = State::getAssets(state, addressStr);
 

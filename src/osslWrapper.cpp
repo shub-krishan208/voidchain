@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 #include <openssl/param_build.h>
 
+#include <cctype>
 #include <iostream>
 #include <vector>
 
@@ -112,6 +113,12 @@ std::string OpenSSLWrapper::publicKeyToPEM(EVP_PKEY *pub) {
 
   std::string pem(data, len);
   BIO_free(bio);
+
+  while (!pem.empty() &&
+         std::isspace(static_cast<unsigned char>(pem.back())) != 0) {
+    pem.pop_back();
+  }
+
   return pem;
 }
 
