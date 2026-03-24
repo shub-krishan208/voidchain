@@ -2,11 +2,65 @@
 #include "../TxnPool.h"
 #include "../models/AssetTxn.h"
 #include "../models/CurrencyTxn.h"
+#include <cctype>
 #include <cmath>
 #include <stdexcept>
 
 namespace {
 constexpr double kFloatEpsilon = 1e-9;
+
+std::string normalizeAddress(std::string value) {
+  std::string normalized;
+  normalized.reserve(value.size());
+
+  for (size_t i = 0; i < value.size(); ++i) {
+    const char current = value[i];
+
+    if (current == '\\' && (i + 1) < value.size()) {
+      const char next = value[i + 1];
+      if (next == 'n') {
+        normalized.push_back('\n');
+        ++i;
+        continue;
+      }
+      if (next == 'r') {
+        if ((i + 3) < value.size() && value[i + 2] == '\\' &&
+            value[i + 3] == 'n') {
+          normalized.push_back('\n');
+          i += 3;
+          continue;
+        }
+        normalized.push_back('\n');
+        ++i;
+        continue;
+      }
+    }
+
+    if (current == '\r') {
+      if ((i + 1) < value.size() && value[i + 1] == '\n') {
+        ++i;
+      }
+      normalized.push_back('\n');
+      continue;
+    }
+
+    normalized.push_back(current);
+  }
+
+  size_t start = 0;
+  while (start < normalized.size() &&
+         std::isspace(static_cast<unsigned char>(normalized[start])) != 0) {
+    ++start;
+  }
+
+  size_t end = normalized.size();
+  while (end > start &&
+         std::isspace(static_cast<unsigned char>(normalized[end - 1])) != 0) {
+    --end;
+  }
+
+  return normalized.substr(start, end - start);
+}
 }
 
 StateValidationResult State::deriveFromChain(const std::vector<Block> &chain,
@@ -69,9 +123,10 @@ StateValidationResult State::validatePoolAdmission(
   }
 
   if (auto currency = std::dynamic_pointer_cast<CurrencyTxn>(candidate)) {
+    const std::string candidateFrom = normalizeAddress(candidate->from);
     double pendingOutflow = 0.0;
     for (const auto &pending : pendingPool) {
-      if (!pending || pending->from != candidate->from ||
+      if (!pending || normalizeAddress(pending->from) != candidateFrom ||
           pending->from == COINBASE) {
         continue;
       }
@@ -82,7 +137,7 @@ StateValidationResult State::validatePoolAdmission(
       pendingOutflow += pendingCurrency->amount;
     }
 
-    const double confirmedBalance = getBalance(state, candidate->from);
+    const double confirmedBalance = getBalance(state, candidateFrom);
     const double availableBalance = confirmedBalance - pendingOutflow;
     if (availableBalance + kFloatEpsilon < currency->amount) {
       return StateValidationResult::failure(
@@ -91,6 +146,7 @@ StateValidationResult State::validatePoolAdmission(
   }
 
   if (auto asset = std::dynamic_pointer_cast<AssetTxn>(candidate)) {
+    const std::string candidateFrom = normalizeAddress(asset->from);
     std::map<std::string, std::string> effectiveOwner = state.ownerByAsset;
     for (const auto &pending : pendingPool) {
       auto pendingAsset = std::dynamic_pointer_cast<AssetTxn>(pending);
@@ -99,22 +155,23 @@ StateValidationResult State::validatePoolAdmission(
       }
 
       auto ownerIt = effectiveOwner.find(pendingAsset->itemId);
-      if (ownerIt != effectiveOwner.end() &&
-          ownerIt->second == pendingAsset->from) {
-        effectiveOwner[pendingAsset->itemId] = pendingAsset->to;
+      const std::string pendingFrom = normalizeAddress(pendingAsset->from);
+      if (ownerIt != effectiveOwner.end() && ownerIt->second == pendingFrom) {
+        effectiveOwner[pendingAsset->itemId] =
+            normalizeAddress(pendingAsset->to);
       }
     }
 
     auto ownerIt = effectiveOwner.find(asset->itemId);
     if (ownerIt == effectiveOwner.end()) {
-      if (asset->from != asset->to) {
+      if (candidateFrom != normalizeAddress(asset->to)) {
         return StateValidationResult::failure(
             "Asset transfer rejected: unowned assets require self-claim");
       }
       return StateValidationResult::success();
     }
 
-    if (ownerIt->second != asset->from) {
+    if (ownerIt->second != candidateFrom) {
       return StateValidationResult::failure(
           "Asset transfer rejected: sender is not current owner");
     }
@@ -162,7 +219,7 @@ StateValidationResult State::validateFullChain(const std::vector<Block> &chain) 
 }
 
 double State::getBalance(const DerivedState &state, const std::string &address) {
-  auto it = state.balances.find(address);
+  auto it = state.balances.find(normalizeAddress(address));
   if (it == state.balances.end()) {
     return 0.0;
   }
@@ -171,7 +228,7 @@ double State::getBalance(const DerivedState &state, const std::string &address) 
 
 std::set<std::string> State::getAssets(const DerivedState &state,
                                        const std::string &address) {
-  auto it = state.assetsByOwner.find(address);
+  auto it = state.assetsByOwner.find(normalizeAddress(address));
   if (it == state.assetsByOwner.end()) {
     return {};
   }
@@ -195,7 +252,8 @@ StateValidationResult State::applyTxn(const std::shared_ptr<Txn> &txn,
 
   auto currency = std::dynamic_pointer_cast<CurrencyTxn>(txn);
   if (currency) {
-    if (currency->to.empty() || currency->amount <= 0.0) {
+    const std::string toAddress = normalizeAddress(currency->to);
+    if (toAddress.empty() || currency->amount <= 0.0) {
       return StateValidationResult::failure(
           "Currency transaction must have positive amount and recipient");
     }
@@ -205,56 +263,59 @@ StateValidationResult State::applyTxn(const std::shared_ptr<Txn> &txn,
         return StateValidationResult::failure(
             "Coinbase transaction amount must match canonical mining reward");
       }
-      state.balances[currency->to] += currency->amount;
+      state.balances[toAddress] += currency->amount;
       return StateValidationResult::success();
     }
 
-    if (currency->from.empty()) {
+    const std::string fromAddress = normalizeAddress(currency->from);
+    if (fromAddress.empty()) {
       return StateValidationResult::failure(
           "Currency transaction sender cannot be empty");
     }
 
-    const double senderBalance = getBalance(state, currency->from);
+    const double senderBalance = getBalance(state, fromAddress);
     if (senderBalance + kFloatEpsilon < currency->amount) {
       return StateValidationResult::failure(
           "Currency transaction rejected: insufficient balance");
     }
 
-    state.balances[currency->from] = senderBalance - currency->amount;
-    state.balances[currency->to] += currency->amount;
+    state.balances[fromAddress] = senderBalance - currency->amount;
+    state.balances[toAddress] += currency->amount;
     return StateValidationResult::success();
   }
 
   auto asset = std::dynamic_pointer_cast<AssetTxn>(txn);
   if (asset) {
-    if (asset->from.empty() || asset->to.empty() || asset->itemId.empty()) {
+    const std::string fromAddress = normalizeAddress(asset->from);
+    const std::string toAddress = normalizeAddress(asset->to);
+    if (fromAddress.empty() || toAddress.empty() || asset->itemId.empty()) {
       return StateValidationResult::failure(
           "Asset transaction must include sender, recipient, and itemId");
     }
 
     auto ownerIt = state.ownerByAsset.find(asset->itemId);
     if (ownerIt == state.ownerByAsset.end()) {
-      if (asset->from != asset->to) {
+      if (fromAddress != toAddress) {
         return StateValidationResult::failure(
             "Asset transaction rejected: unowned assets require self-claim");
       }
-      state.ownerByAsset[asset->itemId] = asset->from;
-      state.assetsByOwner[asset->from].insert(asset->itemId);
+      state.ownerByAsset[asset->itemId] = fromAddress;
+      state.assetsByOwner[fromAddress].insert(asset->itemId);
       return StateValidationResult::success();
     }
 
-    if (ownerIt->second != asset->from) {
+    if (ownerIt->second != fromAddress) {
       return StateValidationResult::failure(
           "Asset transaction rejected: sender is not current owner");
     }
 
-    state.ownerByAsset[asset->itemId] = asset->to;
+    state.ownerByAsset[asset->itemId] = toAddress;
 
-    auto fromAssetsIt = state.assetsByOwner.find(asset->from);
+    auto fromAssetsIt = state.assetsByOwner.find(fromAddress);
     if (fromAssetsIt != state.assetsByOwner.end()) {
       fromAssetsIt->second.erase(asset->itemId);
     }
-    state.assetsByOwner[asset->to].insert(asset->itemId);
+    state.assetsByOwner[toAddress].insert(asset->itemId);
     return StateValidationResult::success();
   }
 

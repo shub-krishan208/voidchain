@@ -27,6 +27,19 @@ void signTxnWithKey(Txn &txn, EVP_PKEY *keyPair) {
   auto sigBytes = OpenSSLWrapper::sign(keyPair, txn.toSignableJson().dump());
   txn.signature = HexUtils::toHex(sigBytes);
 }
+
+std::string withEscapedNewlines(const std::string &value) {
+  std::string escaped;
+  escaped.reserve(value.size() + 8);
+  for (const char ch : value) {
+    if (ch == '\n') {
+      escaped += "\\n";
+    } else {
+      escaped.push_back(ch);
+    }
+  }
+  return escaped;
+}
 } // namespace
 
 TEST(WalletApiTest, PrivateKeyHexRoundTripRestoresSameAddress) {
@@ -147,4 +160,44 @@ TEST(WalletApiTest, MineToAddressUsesProvidedRecipient) {
   EXPECT_DOUBLE_EQ(rewardTxn->amount, Miner::MINING_REWARD);
 
   EVP_PKEY_free(beneficiaryKey);
+}
+
+TEST(WalletApiTest, EscapedNewlineRecipientAddressStillCreditsCanonicalWallet) {
+  Blockchain blockchain;
+  TxnPool pool;
+  Wallet minerWallet;
+  Miner miner(blockchain, pool, minerWallet);
+
+  EVP_PKEY *senderKey = OpenSSLWrapper::generateKeyPair();
+  EVP_PKEY *recipientKey = OpenSSLWrapper::generateKeyPair();
+  ASSERT_NE(senderKey, nullptr);
+  ASSERT_NE(recipientKey, nullptr);
+
+  const std::string senderAddress = addressFromKeyPair(senderKey);
+  const std::string recipientAddress = addressFromKeyPair(recipientKey);
+
+  // Fund sender first via mine-to-address.
+  miner.mine(senderAddress);
+
+  auto spendTxn = std::make_shared<CurrencyTxn>();
+  spendTxn->id = generateUUID();
+  spendTxn->from = senderAddress;
+  spendTxn->to = withEscapedNewlines(recipientAddress);
+  spendTxn->amount = 10.0;
+  signTxnWithKey(*spendTxn, senderKey);
+
+  auto admission =
+      State::validatePoolAdmission(spendTxn, blockchain.getChain(), pool.getTxn());
+  ASSERT_TRUE(admission.ok);
+  ASSERT_TRUE(pool.addTxn(spendTxn));
+
+  miner.mine();
+
+  DerivedState state = State::deriveFromChainOrThrow(blockchain.getChain());
+  EXPECT_NEAR(State::getBalance(state, senderAddress), 40.0, 1e-9);
+  EXPECT_NEAR(State::getBalance(state, recipientAddress), 10.0, 1e-9);
+  EXPECT_NEAR(State::getBalance(state, spendTxn->to), 10.0, 1e-9);
+
+  EVP_PKEY_free(recipientKey);
+  EVP_PKEY_free(senderKey);
 }

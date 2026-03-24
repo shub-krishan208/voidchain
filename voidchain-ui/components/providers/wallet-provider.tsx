@@ -14,7 +14,12 @@ type ActiveWallet = {
 };
 
 function normalizeAddress(address: string) {
-  return address.trim();
+  return address
+    .replaceAll("\\r\\n", "\n")
+    .replaceAll("\\n", "\n")
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n")
+    .trim();
 }
 
 type WalletContextValue = {

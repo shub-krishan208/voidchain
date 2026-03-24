@@ -11,6 +11,15 @@ import { JsonPreview } from "@/components/ui/json-preview";
 import { SectionHeader } from "@/components/ui/section-header";
 import { voidchainClient } from "@/lib/voidchain/client";
 
+function normalizeAddressInput(value: string) {
+  return value
+    .replaceAll("\\r\\n", "\n")
+    .replaceAll("\\n", "\n")
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n")
+    .trim();
+}
+
 export default function MiningPage() {
   const { wallet } = useWallet();
   const { miningHistory, addMineResult } = useMining();
@@ -69,7 +78,7 @@ export default function MiningPage() {
                 setIsMining(true);
                 try {
                   const result = await voidchainClient.mine(
-                    minerAddress.trim() || undefined,
+                    normalizeAddressInput(minerAddress) || undefined,
                   );
                   addMineResult(result);
                   pushToast({

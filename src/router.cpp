@@ -44,22 +44,76 @@ std::string deriveAddressPem(EVP_PKEY *keyPair) {
   return pem;
 }
 
+std::string normalizeAddress(std::string value) {
+  std::string normalized;
+  normalized.reserve(value.size());
+
+  for (size_t i = 0; i < value.size(); ++i) {
+    const char current = value[i];
+
+    if (current == '\\' && (i + 1) < value.size()) {
+      const char next = value[i + 1];
+      if (next == 'n') {
+        normalized.push_back('\n');
+        ++i;
+        continue;
+      }
+      if (next == 'r') {
+        if ((i + 3) < value.size() && value[i + 2] == '\\' &&
+            value[i + 3] == 'n') {
+          normalized.push_back('\n');
+          i += 3;
+          continue;
+        }
+        normalized.push_back('\n');
+        ++i;
+        continue;
+      }
+    }
+
+    if (current == '\r') {
+      if ((i + 1) < value.size() && value[i + 1] == '\n') {
+        ++i;
+      }
+      normalized.push_back('\n');
+      continue;
+    }
+
+    normalized.push_back(current);
+  }
+
+  size_t start = 0;
+  while (start < normalized.size() &&
+         std::isspace(static_cast<unsigned char>(normalized[start])) != 0) {
+    ++start;
+  }
+
+  size_t end = normalized.size();
+  while (end > start &&
+         std::isspace(static_cast<unsigned char>(normalized[end - 1])) != 0) {
+    --end;
+  }
+
+  return normalized.substr(start, end - start);
+}
+
 bool transactionTouchesAddress(const std::shared_ptr<Txn> &txn,
                                const std::string &address) {
   if (!txn) {
     return false;
   }
 
-  if (txn->from == address) {
+  const std::string normalizedAddress = normalizeAddress(address);
+  if (normalizeAddress(txn->from) == normalizedAddress) {
     return true;
   }
 
   if (auto currency = std::dynamic_pointer_cast<CurrencyTxn>(txn)) {
-    return currency->to == address;
+    return normalizeAddress(currency->to) == normalizedAddress;
   }
 
   if (auto asset = std::dynamic_pointer_cast<AssetTxn>(txn)) {
-    return asset->to == address;
+    return normalizeAddress(asset->to) == normalizedAddress;
   }
 
   return false;
@@ -71,15 +125,15 @@ crow::json::wvalue transactionSummary(const std::shared_ptr<Txn> &txn,
   crow::json::wvalue item;
   item["txId"] = txn->id;
   item["type"] = txn->getType();
-  item["from"] = txn->from;
+  item["from"] = normalizeAddress(txn->from);
   item["blockHeight"] = static_cast<int>(blockHeight);
   item["timestamp"] = blockTimestamp;
 
   if (auto currency = std::dynamic_pointer_cast<CurrencyTxn>(txn)) {
-    item["to"] = currency->to;
+    item["to"] = normalizeAddress(currency->to);
     item["amount"] = currency->amount;
   } else if (auto asset = std::dynamic_pointer_cast<AssetTxn>(txn)) {
-    item["to"] = asset->to;
+    item["to"] = normalizeAddress(asset->to);
     item["itemId"] = asset->itemId;
     item["meta"] = asset->meta;
   }
@@ -110,22 +164,6 @@ collectTransactionsForAddress(const std::vector<Block> &chain,
   }
 
   return out;
-}
-
-std::string trimWhitespace(std::string value) {
-  size_t start = 0;
-  while (start < value.size() &&
-         std::isspace(static_cast<unsigned char>(value[start])) != 0) {
-    ++start;
-  }
-
-  size_t end = value.size();
-  while (end > start &&
-         std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
-    --end;
-  }
-
-  return value.substr(start, end - start);
 }
 } // namespace
 
@@ -300,7 +338,7 @@ void Router::registerRoutes() {
         }
 
         try {
-          const std::string addressStr = trimWhitespace(std::string(address));
+          const std::string addressStr = normalizeAddress(std::string(address));
           if (addressStr.empty()) {
             return crow::response(400, "Missing required query param: address");
           }
@@ -348,7 +386,7 @@ void Router::registerRoutes() {
         }
 
         try {
-          const std::string addressStr = trimWhitespace(std::string(address));
+          const std::string addressStr = normalizeAddress(std::string(address));
           if (addressStr.empty()) {
             return crow::response(400, "Missing required query param: address");
           }
@@ -377,7 +415,7 @@ void Router::registerRoutes() {
           return crow::response(400, "Missing required query param: address");
         }
 
-        const std::string addressStr = trimWhitespace(std::string(address));
+        const std::string addressStr = normalizeAddress(std::string(address));
         if (addressStr.empty()) {
           return crow::response(400, "Missing required query param: address");
         }
@@ -409,7 +447,7 @@ void Router::registerRoutes() {
             chainSnapshot = blockchain_.getChain();
           }
 
-          const std::string addressStr = trimWhitespace(std::string(address));
+          const std::string addressStr = normalizeAddress(std::string(address));
           if (addressStr.empty()) {
             return crow::response(400, "Missing required query param: address");
           }
@@ -463,6 +501,12 @@ void Router::registerRoutes() {
           }
           if (!body.contains("signature")) {
             body["signature"] = "";
+          }
+          if (body.contains("from") && body["from"].is_string()) {
+            body["from"] = normalizeAddress(body["from"].get<std::string>());
+          }
+          if (body.contains("to") && body["to"].is_string()) {
+            body["to"] = normalizeAddress(body["to"].get<std::string>());
           }
 
           auto txn = TxnFactory::createTxn(body);
@@ -520,6 +564,9 @@ void Router::registerRoutes() {
           body.erase("secretKey");
           body["from"] = fromAddress;
           body["signature"] = "";
+          if (body.contains("to") && body["to"].is_string()) {
+            body["to"] = normalizeAddress(body["to"].get<std::string>());
+          }
           if (!body.contains("id") ||
               (body["id"].is_string() && body["id"].get<std::string>().empty())) {
             body["id"] = generateUUID();
@@ -575,7 +622,7 @@ void Router::registerRoutes() {
               if (!body["minerAddress"].is_string()) {
                 return crow::response(400, "minerAddress must be a string");
               }
-              minerAddress = body["minerAddress"].get<std::string>();
+              minerAddress = normalizeAddress(body["minerAddress"].get<std::string>());
             }
           }
 

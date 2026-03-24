@@ -21,6 +21,15 @@ function shortAddress(value: string) {
   return `${value.slice(0, 14)}...${value.slice(-10)}`;
 }
 
+function normalizeAddressInput(value: string) {
+  return value
+    .replaceAll("\\r\\n", "\n")
+    .replaceAll("\\n", "\n")
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n")
+    .trim();
+}
+
 export default function WalletPage() {
   const { pushToast } = useToast();
   const {
@@ -227,9 +236,10 @@ export default function WalletPage() {
         <CardDescription>
           Signed via `/transact/signed` using your unlocked wallet key.
         </CardDescription>
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_auto]">
-          <Input
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px] md:grid-rows-[auto_auto]">
+          <Textarea
             placeholder="Recipient address (PEM)"
+            className="md:row-span-2"
             value={sendTo}
             onChange={(event) => setSendTo(event.target.value)}
           />
@@ -248,13 +258,17 @@ export default function WalletPage() {
                 if (!wallet) {
                   throw new Error("Connect your wallet first.");
                 }
+                const recipientAddress = normalizeAddressInput(sendTo);
+                if (!recipientAddress) {
+                  throw new Error("Recipient address is required.");
+                }
                 const amount = Number(sendAmount);
                 if (!Number.isFinite(amount) || amount <= 0) {
                   throw new Error("Amount must be greater than zero.");
                 }
                 await transactSigned({
                   type: "CURRENCY",
-                  to: sendTo.trim(),
+                  to: recipientAddress,
                   amount,
                 });
                 pushToast({
