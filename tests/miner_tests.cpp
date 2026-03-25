@@ -48,7 +48,7 @@ TEST(MinerTest, MineThrowsWhenPoolIsEmpty) {
   auto reward = minedJson["transactions"][0];
   EXPECT_EQ(std::string(reward["type"].s()), "CURRENCY");
   EXPECT_EQ(std::string(reward["from"].s()), "COINBASE");
-  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddressPem());
+  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddress());
   EXPECT_DOUBLE_EQ(reward["amount"].d(), Miner::MINING_REWARD);
 }
 
@@ -64,7 +64,7 @@ TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
 
   auto tx1 = makeSignedCurrencyTxn(wallet, "bob", 10.0);
   // unowned assets must be self-claimed first
-  auto tx2 = makeSignedAssetTxn(wallet, wallet.getAddressPem(), "item-77", "epic");
+  auto tx2 = makeSignedAssetTxn(wallet, wallet.getAddress(), "item-77", "epic");
 
   ASSERT_TRUE(pool.addTxn(tx1));
   ASSERT_TRUE(pool.addTxn(tx2));
@@ -83,7 +83,7 @@ TEST(MinerTest, MineIncludesPendingTransactionsAndClearsMinedOnes) {
 
   auto reward = minedJson["transactions"][0];
   EXPECT_EQ(std::string(reward["from"].s()), "COINBASE");
-  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddressPem());
+  EXPECT_EQ(std::string(reward["to"].s()), wallet.getAddress());
   EXPECT_DOUBLE_EQ(reward["amount"].d(), Miner::MINING_REWARD);
 }
 

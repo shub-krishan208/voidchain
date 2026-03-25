@@ -10,6 +10,7 @@
 #include "../src/wallet.h"
 
 #include <gtest/gtest.h>
+#include <cctype>
 
 namespace {
 std::string addressFromKeyPair(EVP_PKEY *keyPair) {
@@ -18,38 +19,36 @@ std::string addressFromKeyPair(EVP_PKEY *keyPair) {
     return {};
   }
 
-  std::string address = OpenSSLWrapper::publicKeyToPEM(pub);
+  std::string address = OpenSSLWrapper::publicKeyToAddress(pub);
   EVP_PKEY_free(pub);
   return address;
 }
 
 void signTxnWithKey(Txn &txn, EVP_PKEY *keyPair) {
+  EVP_PKEY *pub = OpenSSLWrapper::extractPublicKey(keyPair);
+  if (!pub) {
+    txn.signature.clear();
+    return;
+  }
+  txn.senderPubKey = OpenSSLWrapper::publicKeyToRawHex(pub);
+  EVP_PKEY_free(pub);
+
   auto sigBytes = OpenSSLWrapper::sign(keyPair, txn.toSignableJson().dump());
   txn.signature = HexUtils::toHex(sigBytes);
 }
 
-std::string withEscapedNewlines(const std::string &value) {
-  std::string escaped;
-  escaped.reserve(value.size() + 8);
-  for (const char ch : value) {
-    if (ch == '\n') {
-      escaped += "\\n";
-    } else {
-      escaped.push_back(ch);
-    }
+std::string toUppercase(std::string value) {
+  for (char &ch : value) {
+    ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
   }
-  return escaped;
+  return value;
 }
 
-std::string withoutLineBreaks(const std::string &value) {
-  std::string flattened;
-  flattened.reserve(value.size());
-  for (const char ch : value) {
-    if (ch != '\n' && ch != '\r') {
-      flattened.push_back(ch);
-    }
+std::string withoutPrefix(const std::string &value) {
+  if (value.rfind("0x", 0) == 0 || value.rfind("0X", 0) == 0) {
+    return value.substr(2);
   }
-  return flattened;
+  return value;
 }
 } // namespace
 
@@ -173,7 +172,7 @@ TEST(WalletApiTest, MineToAddressUsesProvidedRecipient) {
   EVP_PKEY_free(beneficiaryKey);
 }
 
-TEST(WalletApiTest, EscapedNewlineRecipientAddressStillCreditsCanonicalWallet) {
+TEST(WalletApiTest, UppercaseRecipientAddressStillCreditsCanonicalWallet) {
   Blockchain blockchain;
   TxnPool pool;
   Wallet minerWallet;
@@ -193,7 +192,7 @@ TEST(WalletApiTest, EscapedNewlineRecipientAddressStillCreditsCanonicalWallet) {
   auto spendTxn = std::make_shared<CurrencyTxn>();
   spendTxn->id = generateUUID();
   spendTxn->from = senderAddress;
-  spendTxn->to = withEscapedNewlines(recipientAddress);
+  spendTxn->to = toUppercase(recipientAddress);
   spendTxn->amount = 10.0;
   signTxnWithKey(*spendTxn, senderKey);
 
@@ -213,7 +212,7 @@ TEST(WalletApiTest, EscapedNewlineRecipientAddressStillCreditsCanonicalWallet) {
   EVP_PKEY_free(senderKey);
 }
 
-TEST(WalletApiTest, FlattenedRecipientAddressStillCreditsCanonicalWallet) {
+TEST(WalletApiTest, PrefixlessRecipientAddressStillCreditsCanonicalWallet) {
   Blockchain blockchain;
   TxnPool pool;
   Wallet minerWallet;
@@ -233,7 +232,7 @@ TEST(WalletApiTest, FlattenedRecipientAddressStillCreditsCanonicalWallet) {
   auto spendTxn = std::make_shared<CurrencyTxn>();
   spendTxn->id = generateUUID();
   spendTxn->from = senderAddress;
-  spendTxn->to = withoutLineBreaks(recipientAddress);
+  spendTxn->to = withoutPrefix(recipientAddress);
   spendTxn->amount = 11.0;
   signTxnWithKey(*spendTxn, senderKey);
 

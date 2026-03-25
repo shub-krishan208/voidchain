@@ -2,6 +2,7 @@ export type CurrencyTxn = {
   type: "CURRENCY";
   id: string;
   from: string;
+  senderPubKey: string;
   to: string;
   amount: number;
   signature: string;
@@ -11,6 +12,7 @@ export type AssetTxn = {
   type: "ASSET";
   id: string;
   from: string;
+  senderPubKey: string;
   to: string;
   itemId: string;
   meta: string;

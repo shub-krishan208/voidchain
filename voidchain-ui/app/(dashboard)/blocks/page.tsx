@@ -23,6 +23,25 @@ export default function BlocksPage() {
   const [txId, setTxId] = React.useState("");
   const [proof, setProof] = React.useState<ProofResponse | null>(null);
 
+  const copyValue = React.useCallback(
+    async (value: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(value);
+        pushToast({
+          title: `${label} copied`,
+          description: `Full ${label.toLowerCase()} copied to clipboard.`,
+        });
+      } catch {
+        pushToast({
+          title: "Copy failed",
+          description: "Clipboard access was denied.",
+          variant: "danger",
+        });
+      }
+    },
+    [pushToast],
+  );
+
   const refresh = React.useCallback(async () => {
     setIsLoading(true);
     try {
@@ -298,7 +317,23 @@ export default function BlocksPage() {
                   <DataFieldGroup>
                     <DataField
                       label="Transaction ID"
-                      value={truncateHash(proof.txId, 14, 10)}
+                      value={
+                        <button
+                          type="button"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 transition hover:bg-surface-2 hover:text-foreground"
+                          title="Copy transaction ID"
+                          onClick={() => copyValue(proof.txId, "Transaction ID")}
+                        >
+                          <span>{truncateHash(proof.txId, 14, 10)}</span>
+                          <svg
+                            aria-hidden
+                            viewBox="0 0 16 16"
+                            className="h-3 w-3 fill-current opacity-80"
+                          >
+                            <path d="M3 1.75A1.75 1.75 0 0 1 4.75 0h6.5A1.75 1.75 0 0 1 13 1.75V3h-1.5V1.75a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25v8.5a.25.25 0 0 0 .25.25H6V12H4.75A1.75 1.75 0 0 1 3 10.25v-8.5ZM7 5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75v8.5A1.75 1.75 0 0 1 15.25 16h-6.5A1.75 1.75 0 0 1 7 14.25v-8.5Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5Z" />
+                          </svg>
+                        </button>
+                      }
                       mono
                     />
                     <DataField

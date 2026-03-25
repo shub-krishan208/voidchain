@@ -12,7 +12,8 @@ TEST(WalletTest, WalletBasics) {
   EXPECT_NE(pub, nullptr);
 
   auto address = w.getAddress();
-  EXPECT_NE(address, nullptr);
+  EXPECT_FALSE(address.empty());
+  EXPECT_EQ(address.rfind("0x", 0), 0u);
 
   std::string data = "Test data for signing";
   std::vector<unsigned char> signature = w.sign(data);
@@ -43,7 +44,8 @@ TEST(WalletTest, SignCurrencyTxn) {
   // signature should be populated
   EXPECT_FALSE(txn.signature.empty());
   EXPECT_FALSE(txn.from.empty());
-  EXPECT_EQ(txn.from, w.getAddressPem());
+  EXPECT_EQ(txn.from, w.getAddress());
+  EXPECT_EQ(txn.senderPubKey, w.getPublicKeyHex());
 
   // verify the signature against the signable JSON
   auto sigBytes = HexUtils::fromHex(txn.signature);
@@ -68,7 +70,8 @@ TEST(WalletTest, SignAssetTxn) {
   EXPECT_EQ(txn.id.size(), 36u);
   EXPECT_FALSE(txn.signature.empty());
   EXPECT_FALSE(txn.from.empty());
-  EXPECT_EQ(txn.from, w.getAddressPem());
+  EXPECT_EQ(txn.from, w.getAddress());
+  EXPECT_EQ(txn.senderPubKey, w.getPublicKeyHex());
 
   auto sigBytes = HexUtils::fromHex(txn.signature);
   EVP_PKEY *pub = w.getPublicKey();
@@ -133,7 +136,7 @@ TEST(WalletTest, SignTxnRejectsMismatchedSender) {
   Wallet other;
 
   CurrencyTxn txn;
-  txn.from = other.getAddressPem();
+  txn.from = other.getAddress();
   txn.to = "bob";
   txn.amount = 12.0;
 

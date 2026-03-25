@@ -141,6 +141,119 @@ EVP_PKEY *OpenSSLWrapper::extractPublicKey(const EVP_PKEY *keypair) {
   return pub;
 }
 
+std::vector<unsigned char> OpenSSLWrapper::publicKeyToRawBytes(EVP_PKEY *pub) {
+  if (!pub) {
+    return {};
+  }
+
+  size_t rawLen = 0;
+  if (EVP_PKEY_get_octet_string_param(pub, OSSL_PKEY_PARAM_PUB_KEY, nullptr, 0,
+                                      &rawLen) != 1 ||
+      rawLen == 0) {
+    return {};
+  }
+
+  std::vector<unsigned char> raw(rawLen);
+  if (EVP_PKEY_get_octet_string_param(pub, OSSL_PKEY_PARAM_PUB_KEY, raw.data(),
+                                      raw.size(), &rawLen) != 1) {
+    return {};
+  }
+  raw.resize(rawLen);
+  return raw;
+}
+
+std::string OpenSSLWrapper::publicKeyToRawHex(EVP_PKEY *pub) {
+  const auto raw = publicKeyToRawBytes(pub);
+  if (raw.empty()) {
+    return {};
+  }
+  return HexUtils::toHex(raw);
+}
+
+std::string OpenSSLWrapper::publicKeyToAddress(EVP_PKEY *pub) {
+  const auto raw = publicKeyToRawBytes(pub);
+  if (raw.empty()) {
+    return {};
+  }
+
+  unsigned char digest[EVP_MAX_MD_SIZE] = {0};
+  unsigned int digestLen = 0;
+  if (EVP_Digest(raw.data(), raw.size(), digest, &digestLen, EVP_sha256(),
+                 nullptr) != 1) {
+    return {};
+  }
+  if (digestLen < 20) {
+    return {};
+  }
+
+  std::vector<unsigned char> addressBytes(digest + digestLen - 20,
+                                          digest + digestLen);
+  return "0x" + HexUtils::toHex(addressBytes);
+}
+
+EVP_PKEY *OpenSSLWrapper::publicKeyFromRawHex(const std::string &publicHex) {
+  std::vector<unsigned char> pubBytes;
+  try {
+    pubBytes = HexUtils::fromHex(publicHex);
+  } catch (const std::exception &) {
+    return nullptr;
+  }
+
+  if (pubBytes.size() != 65 || pubBytes[0] != 0x04) {
+    return nullptr;
+  }
+
+  EVP_PKEY *pubKey = nullptr;
+  OSSL_PARAM_BLD *paramBld = nullptr;
+  OSSL_PARAM *params = nullptr;
+  EVP_PKEY_CTX *pkeyCtx = nullptr;
+  bool ok = false;
+
+  do {
+    paramBld = OSSL_PARAM_BLD_new();
+    if (!paramBld) {
+      break;
+    }
+
+    if (OSSL_PARAM_BLD_push_utf8_string(paramBld, OSSL_PKEY_PARAM_GROUP_NAME,
+                                        "secp256k1", 0) != 1) {
+      break;
+    }
+    if (OSSL_PARAM_BLD_push_octet_string(paramBld, OSSL_PKEY_PARAM_PUB_KEY,
+                                         pubBytes.data(), pubBytes.size()) != 1) {
+      break;
+    }
+
+    params = OSSL_PARAM_BLD_to_param(paramBld);
+    if (!params) {
+      break;
+    }
+
+    pkeyCtx = EVP_PKEY_CTX_new_from_name(nullptr, "EC", nullptr);
+    if (!pkeyCtx) {
+      break;
+    }
+    if (EVP_PKEY_fromdata_init(pkeyCtx) <= 0) {
+      break;
+    }
+    if (EVP_PKEY_fromdata(pkeyCtx, &pubKey, EVP_PKEY_PUBLIC_KEY, params) <= 0) {
+      break;
+    }
+
+    ok = true;
+  } while (false);
+
+  if (!ok) {
+    EVP_PKEY_free(pubKey);
+    pubKey = nullptr;
+  }
+
+  EVP_PKEY_CTX_free(pkeyCtx);
+  OSSL_PARAM_free(params);
+  OSSL_PARAM_BLD_free(paramBld);
+  return pubKey;
+}
+
 std::string OpenSSLWrapper::privateKeyToHex(EVP_PKEY *keyPair) {
   if (!keyPair) {
     return {};

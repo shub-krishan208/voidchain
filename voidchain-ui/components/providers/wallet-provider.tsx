@@ -14,29 +14,21 @@ type ActiveWallet = {
 };
 
 function normalizeAddress(address: string) {
-  const normalized = address
-    .replaceAll("\\r\\n", "\n")
-    .replaceAll("\\n", "\n")
-    .replaceAll("\r\n", "\n")
-    .replaceAll("\r", "\n")
-    .trim();
-
-  const begin = "-----BEGIN PUBLIC KEY-----";
-  const end = "-----END PUBLIC KEY-----";
-  const beginPos = normalized.indexOf(begin);
-  const endPos = normalized.indexOf(end, beginPos + begin.length);
-  if (beginPos === -1 || endPos === -1 || endPos <= beginPos) {
-    return normalized;
+  const trimmed = address.trim();
+  if (!trimmed) {
+    return trimmed;
   }
 
-  const bodyRaw = normalized.slice(beginPos + begin.length, endPos);
-  const body = bodyRaw.replace(/\s+/g, "");
-  if (!body) {
-    return normalized;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("0x")) {
+    return `0x${lower.slice(2)}`;
   }
 
-  const lines = body.match(/.{1,64}/g) || [];
-  return `${begin}\n${lines.join("\n")}\n${end}`;
+  if (/^[0-9a-f]{40}$/i.test(trimmed)) {
+    return `0x${lower}`;
+  }
+
+  return lower;
 }
 
 type WalletContextValue = {

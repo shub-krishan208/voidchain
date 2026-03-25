@@ -17,29 +17,21 @@ import { voidchainClient } from "@/lib/voidchain/client";
 import type { TransactionsResponse, WalletInfo } from "@/lib/voidchain/types";
 
 function normalizeAddressInput(value: string) {
-  const normalized = value
-    .replaceAll("\\r\\n", "\n")
-    .replaceAll("\\n", "\n")
-    .replaceAll("\r\n", "\n")
-    .replaceAll("\r", "\n")
-    .trim();
-
-  const begin = "-----BEGIN PUBLIC KEY-----";
-  const end = "-----END PUBLIC KEY-----";
-  const beginPos = normalized.indexOf(begin);
-  const endPos = normalized.indexOf(end, beginPos + begin.length);
-  if (beginPos === -1 || endPos === -1 || endPos <= beginPos) {
-    return normalized;
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
   }
 
-  const bodyRaw = normalized.slice(beginPos + begin.length, endPos);
-  const body = bodyRaw.replace(/\s+/g, "");
-  if (!body) {
-    return normalized;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("0x")) {
+    return `0x${lower.slice(2)}`;
   }
 
-  const lines = body.match(/.{1,64}/g) || [];
-  return `${begin}\n${lines.join("\n")}\n${end}`;
+  if (/^[0-9a-f]{40}$/i.test(trimmed)) {
+    return `0x${lower}`;
+  }
+
+  return lower;
 }
 
 export default function WalletPage() {
@@ -261,7 +253,7 @@ export default function WalletPage() {
         </CardDescription>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px] md:grid-rows-[auto_auto]">
           <Textarea
-            placeholder="Recipient address (PEM)"
+            placeholder="Recipient address (0x...)"
             className="md:row-span-2"
             value={sendTo}
             onChange={(event) => setSendTo(event.target.value)}

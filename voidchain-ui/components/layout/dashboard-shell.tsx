@@ -28,6 +28,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { wallet, hasVault, storedAddress, connectWithPasskey, disconnect } =
     useWallet();
   const { pushToast } = useToast();
+  const activeAddress = wallet?.address ?? storedAddress ?? null;
 
   return (
     <div className="flex min-h-full flex-1">
@@ -65,13 +66,41 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Badge variant={wallet ? "success" : "default"}>
                 {wallet ? "wallet connected" : "wallet idle"}
               </Badge>
-              <p className="hidden text-xs text-muted md:block">
-                {wallet
-                  ? shortAddress(wallet.address)
-                  : storedAddress
-                    ? `vault: ${shortAddress(storedAddress)}`
-                    : "No passkey wallet saved"}
-              </p>
+              {activeAddress ? (
+                <button
+                  type="button"
+                  className="hidden cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs text-muted transition hover:bg-surface-2 hover:text-foreground md:inline-flex"
+                  title="Copy wallet address"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(activeAddress);
+                      pushToast({
+                        title: "Address copied",
+                        description: "Full wallet address copied to clipboard.",
+                      });
+                    } catch {
+                      pushToast({
+                        title: "Copy failed",
+                        description: "Clipboard access was denied.",
+                        variant: "danger",
+                      });
+                    }
+                  }}
+                >
+                  <span>{wallet ? shortAddress(activeAddress) : `vault: ${shortAddress(activeAddress)}`}</span>
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 16 16"
+                    className="h-3 w-3 fill-current opacity-80"
+                  >
+                    <path d="M3 1.75A1.75 1.75 0 0 1 4.75 0h6.5A1.75 1.75 0 0 1 13 1.75V3h-1.5V1.75a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25v8.5a.25.25 0 0 0 .25.25H6V12H4.75A1.75 1.75 0 0 1 3 10.25v-8.5ZM7 5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75v8.5A1.75 1.75 0 0 1 15.25 16h-6.5A1.75 1.75 0 0 1 7 14.25v-8.5Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5Z" />
+                  </svg>
+                </button>
+              ) : (
+                <p className="hidden text-xs text-muted md:block">
+                  No passkey wallet saved
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

@@ -42,7 +42,7 @@ TEST(StateTest, DerivesRewardAccumulationForBalances) {
   miner.mine();
 
   DerivedState state = State::deriveFromChainOrThrow(blockchain.getChain());
-  EXPECT_DOUBLE_EQ(State::getBalance(state, minerWallet.getAddressPem()), 100.0);
+  EXPECT_DOUBLE_EQ(State::getBalance(state, minerWallet.getAddress()), 100.0);
 }
 
 TEST(StateTest, RejectsInsufficientBalanceOnPoolAdmission) {
@@ -63,17 +63,17 @@ TEST(StateTest, DerivesAssetOwnershipAfterClaimAndTransfer) {
   Wallet recipient;
   Miner miner(blockchain, pool, owner);
 
-  auto claim = makeSignedAssetTxn(owner, owner.getAddressPem(), "item-77", "epic");
+  auto claim = makeSignedAssetTxn(owner, owner.getAddress(), "item-77", "epic");
   ASSERT_TRUE(pool.addTxn(claim));
   miner.mine();
 
-  auto transfer = makeSignedAssetTxn(owner, recipient.getAddressPem(), "item-77",
+  auto transfer = makeSignedAssetTxn(owner, recipient.getAddress(), "item-77",
                                      "epic-transfer");
   ASSERT_TRUE(pool.addTxn(transfer));
   miner.mine();
 
   DerivedState state = State::deriveFromChainOrThrow(blockchain.getChain());
-  EXPECT_EQ(State::getOwner(state, "item-77"), recipient.getAddressPem());
+  EXPECT_EQ(State::getOwner(state, "item-77"), recipient.getAddress());
 }
 
 TEST(StateTest, RejectsAssetTransferByNonOwner) {
@@ -84,12 +84,12 @@ TEST(StateTest, RejectsAssetTransferByNonOwner) {
   Wallet recipient;
   Miner miner(blockchain, pool, owner);
 
-  auto claim = makeSignedAssetTxn(owner, owner.getAddressPem(), "item-99", "rare");
+  auto claim = makeSignedAssetTxn(owner, owner.getAddress(), "item-99", "rare");
   ASSERT_TRUE(pool.addTxn(claim));
   miner.mine();
 
   auto forgedTransfer =
-      makeSignedAssetTxn(attacker, recipient.getAddressPem(), "item-99", "forged");
+      makeSignedAssetTxn(attacker, recipient.getAddress(), "item-99", "forged");
   StateValidationResult result =
       State::validatePoolAdmission(forgedTransfer, blockchain.getChain(), {});
 

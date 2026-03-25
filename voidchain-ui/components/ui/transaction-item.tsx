@@ -1,4 +1,7 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/providers/toast-provider";
 import {
   truncateHash,
   truncateAddress,
@@ -17,6 +20,7 @@ function txId(tx: AnyTx): string {
 }
 
 export function TransactionItem({ tx }: { tx: AnyTx }) {
+  const { pushToast } = useToast();
   const isCurrency = tx.type === "CURRENCY";
   const id = txId(tx);
   const from = tx.from;
@@ -62,9 +66,35 @@ export function TransactionItem({ tx }: { tx: AnyTx }) {
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-2">
         {id ? (
-          <span className="font-mono" title={id}>
-            TX: {truncateHash(id, 6, 4)}
-          </span>
+          <button
+            type="button"
+            className="inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 font-mono transition hover:bg-surface-2 hover:text-foreground"
+            title="Copy transaction ID"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(id);
+                pushToast({
+                  title: "Transaction ID copied",
+                  description: "Full transaction ID copied to clipboard.",
+                });
+              } catch {
+                pushToast({
+                  title: "Copy failed",
+                  description: "Clipboard access was denied.",
+                  variant: "danger",
+                });
+              }
+            }}
+          >
+            <span title={id}>TX: {truncateHash(id, 6, 4)}</span>
+            <svg
+              aria-hidden
+              viewBox="0 0 16 16"
+              className="h-3 w-3 fill-current opacity-80"
+            >
+              <path d="M3 1.75A1.75 1.75 0 0 1 4.75 0h6.5A1.75 1.75 0 0 1 13 1.75V3h-1.5V1.75a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25v8.5a.25.25 0 0 0 .25.25H6V12H4.75A1.75 1.75 0 0 1 3 10.25v-8.5ZM7 5.75A1.75 1.75 0 0 1 8.75 4h6.5A1.75 1.75 0 0 1 17 5.75v8.5A1.75 1.75 0 0 1 15.25 16h-6.5A1.75 1.75 0 0 1 7 14.25v-8.5Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5Z" />
+            </svg>
+          </button>
         ) : null}
         {blockHeight !== undefined ? <span>&middot; Block #{blockHeight}</span> : null}
         {timestamp !== undefined ? (

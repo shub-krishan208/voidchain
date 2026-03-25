@@ -4,12 +4,9 @@ export function truncateHash(hash: string, start = 10, end = 8): string {
 }
 
 export function truncateAddress(addr: string, start = 12, end = 8): string {
-  const cleaned = addr
-    .replace(/-----[A-Z\s]+-----/g, "")
-    .replace(/\s+/g, "")
-    .trim();
-  if (cleaned.length <= start + end + 3) return cleaned;
-  return `${cleaned.slice(0, start)}\u2026${cleaned.slice(-end)}`;
+  const normalized = addr.trim();
+  if (normalized.length <= start + end + 3) return normalized;
+  return `${normalized.slice(0, start)}\u2026${normalized.slice(-end)}`;
 }
 
 export function formatTimestamp(ts: number): string {

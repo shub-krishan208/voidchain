@@ -20,7 +20,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstring>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -30,10 +29,8 @@
 
 namespace {
 constexpr size_t kDefaultRecentTxCount = 20;
-constexpr const char *kPemBeginMarker = "-----BEGIN PUBLIC KEY-----";
-constexpr const char *kPemEndMarker = "-----END PUBLIC KEY-----";
 
-std::string deriveAddressPem(EVP_PKEY *keyPair) {
+std::string deriveAddress(EVP_PKEY *keyPair) {
   if (!keyPair) {
     return {};
   }
@@ -43,97 +40,64 @@ std::string deriveAddressPem(EVP_PKEY *keyPair) {
     return {};
   }
 
-  std::string pem = OpenSSLWrapper::publicKeyToPEM(pub);
+  std::string address = OpenSSLWrapper::publicKeyToAddress(pub);
   EVP_PKEY_free(pub);
-  return pem;
+  return address;
+}
+
+std::string derivePublicKeyHex(EVP_PKEY *keyPair) {
+  if (!keyPair) {
+    return {};
+  }
+
+  EVP_PKEY *pub = OpenSSLWrapper::extractPublicKey(keyPair);
+  if (!pub) {
+    return {};
+  }
+
+  std::string publicKeyHex = OpenSSLWrapper::publicKeyToRawHex(pub);
+  EVP_PKEY_free(pub);
+  return publicKeyHex;
 }
 
 std::string normalizeAddress(std::string value) {
-  std::string normalized;
-  normalized.reserve(value.size());
-
-  for (size_t i = 0; i < value.size(); ++i) {
-    const char current = value[i];
-
-    if (current == '\\' && (i + 1) < value.size()) {
-      const char next = value[i + 1];
-      if (next == 'n') {
-        normalized.push_back('\n');
-        ++i;
-        continue;
-      }
-      if (next == 'r') {
-        if ((i + 3) < value.size() && value[i + 2] == '\\' &&
-            value[i + 3] == 'n') {
-          normalized.push_back('\n');
-          i += 3;
-          continue;
-        }
-        normalized.push_back('\n');
-        ++i;
-        continue;
-      }
-    }
-
-    if (current == '\r') {
-      if ((i + 1) < value.size() && value[i + 1] == '\n') {
-        ++i;
-      }
-      normalized.push_back('\n');
-      continue;
-    }
-
-    normalized.push_back(current);
-  }
-
   size_t start = 0;
-  while (start < normalized.size() &&
-         std::isspace(static_cast<unsigned char>(normalized[start])) != 0) {
+  while (start < value.size() &&
+         std::isspace(static_cast<unsigned char>(value[start])) != 0) {
     ++start;
   }
 
-  size_t end = normalized.size();
+  size_t end = value.size();
   while (end > start &&
-         std::isspace(static_cast<unsigned char>(normalized[end - 1])) != 0) {
+         std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
     --end;
   }
 
-  const std::string trimmed = normalized.substr(start, end - start);
-  const size_t beginPos = trimmed.find(kPemBeginMarker);
-  if (beginPos == std::string::npos) {
-    return trimmed;
+  std::string trimmed = value.substr(start, end - start);
+  if (trimmed.empty()) {
+    return {};
   }
 
-  const size_t bodyStart = beginPos + std::strlen(kPemBeginMarker);
-  const size_t endPos = trimmed.find(kPemEndMarker, bodyStart);
-  if (endPos == std::string::npos || endPos <= bodyStart) {
-    return trimmed;
+  bool hadPrefix = false;
+  if (trimmed.size() >= 2 && trimmed[0] == '0' &&
+      (trimmed[1] == 'x' || trimmed[1] == 'X')) {
+    trimmed.erase(0, 2);
+    hadPrefix = true;
   }
 
-  std::string compactBody;
-  compactBody.reserve(endPos - bodyStart);
-  for (size_t i = bodyStart; i < endPos; ++i) {
-    if (std::isspace(static_cast<unsigned char>(trimmed[i])) == 0) {
-      compactBody.push_back(trimmed[i]);
-    }
-  }
+  std::string lowered = trimmed;
+  std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-  if (compactBody.empty()) {
-    return trimmed;
+  const bool isHexBody =
+      !lowered.empty() &&
+      std::all_of(lowered.begin(), lowered.end(), [](unsigned char c) {
+        return std::isxdigit(c) != 0;
+      });
+  if (hadPrefix || (isHexBody && lowered.size() == 40)) {
+    return "0x" + lowered;
   }
-
-  std::string canonical;
-  canonical.reserve(
-      std::strlen(kPemBeginMarker) + std::strlen(kPemEndMarker) +
-      compactBody.size() + (compactBody.size() / 64) + 8);
-  canonical += kPemBeginMarker;
-  canonical.push_back('\n');
-  for (size_t i = 0; i < compactBody.size(); i += 64) {
-    canonical.append(compactBody, i, std::min<size_t>(64, compactBody.size() - i));
-    canonical.push_back('\n');
-  }
-  canonical += kPemEndMarker;
-  return canonical;
+  return trimmed;
 }
 
 bool transactionTouchesAddress(const std::shared_ptr<Txn> &txn,
@@ -228,7 +192,7 @@ void Router::registerRoutes() {
           return crow::response(500, "Failed to generate wallet keypair");
         }
 
-        const std::string address = deriveAddressPem(keyPair);
+        const std::string address = deriveAddress(keyPair);
         const std::string secretKey = OpenSSLWrapper::privateKeyToHex(keyPair);
         EVP_PKEY_free(keyPair);
 
@@ -261,7 +225,7 @@ void Router::registerRoutes() {
           return crow::response(400, "Invalid secretKey");
         }
 
-        const std::string address = deriveAddressPem(keyPair);
+        const std::string address = deriveAddress(keyPair);
         EVP_PKEY_free(keyPair);
 
         if (address.empty()) {
@@ -541,6 +505,9 @@ void Router::registerRoutes() {
           if (!body.contains("signature")) {
             body["signature"] = "";
           }
+          if (!body.contains("senderPubKey")) {
+            body["senderPubKey"] = "";
+          }
           if (body.contains("from") && body["from"].is_string()) {
             body["from"] = normalizeAddress(body["from"].get<std::string>());
           }
@@ -594,14 +561,20 @@ void Router::registerRoutes() {
         }
 
         try {
-          const std::string fromAddress = deriveAddressPem(keyPair);
+          const std::string fromAddress = deriveAddress(keyPair);
+          const std::string senderPubKey = derivePublicKeyHex(keyPair);
           if (fromAddress.empty()) {
             EVP_PKEY_free(keyPair);
             return crow::response(500, "Failed to derive signer address");
           }
+          if (senderPubKey.empty()) {
+            EVP_PKEY_free(keyPair);
+            return crow::response(500, "Failed to derive signer public key");
+          }
 
           body.erase("secretKey");
           body["from"] = fromAddress;
+          body["senderPubKey"] = senderPubKey;
           body["signature"] = "";
           if (body.contains("to") && body["to"].is_string()) {
             body["to"] = normalizeAddress(body["to"].get<std::string>());

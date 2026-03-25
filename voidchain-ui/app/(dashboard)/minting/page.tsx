@@ -17,6 +17,24 @@ import { truncateAddress } from "@/lib/format";
 import { voidchainClient } from "@/lib/voidchain/client";
 import type { OwnerResponse, TransactResponse } from "@/lib/voidchain/types";
 
+function normalizeAddressInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("0x")) {
+    return `0x${lower.slice(2)}`;
+  }
+
+  if (/^[0-9a-f]{40}$/i.test(trimmed)) {
+    return `0x${lower}`;
+  }
+
+  return lower;
+}
+
 export default function MintingPage() {
   const { wallet, transactSigned } = useWallet();
   const { pushToast } = useToast();
@@ -143,7 +161,7 @@ export default function MintingPage() {
             </CardDescription>
             <div className="mt-4 space-y-3">
               <Input
-                placeholder="Recipient address (PEM)"
+                placeholder="Recipient address (0x...)"
                 value={transferTo}
                 onChange={(event) => setTransferTo(event.target.value)}
               />
@@ -164,7 +182,7 @@ export default function MintingPage() {
                     ensureWallet();
                     const result = await transactSigned({
                       type: "ASSET",
-                      to: transferTo.trim(),
+                      to: normalizeAddressInput(transferTo),
                       itemId: transferItemId.trim(),
                       meta: transferMeta.trim(),
                     });

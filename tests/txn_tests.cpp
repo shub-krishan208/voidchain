@@ -15,6 +15,7 @@ TEST(TxnTest, AssetTxnToJson) {
         {"type", "ASSET"},
         {"id", "txn1"},
         {"from", "Alice"},
+        {"senderPubKey", ""},
         {"to", "Bob"},
         {"itemId", "item123"},
         {"meta", "A rare item"},
@@ -36,6 +37,7 @@ TEST(TxnTest, CurrencyTxnToJson) {
         {"type", "CURRENCY"},
         {"id", "txn2"},
         {"from", "Charlie"},
+        {"senderPubKey", ""},
         {"to", "Dave"},
         {"amount", 100.50},
         {"signature", "signature456"}

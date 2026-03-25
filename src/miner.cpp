@@ -26,8 +26,9 @@ Block Miner::mine(const std::string &minerAddress) {
   auto rewardTxn = std::make_shared<CurrencyTxn>();
   rewardTxn->id = generateUUID();
   rewardTxn->from = "COINBASE";
-  rewardTxn->to = minerAddress.empty() ? wallet_.getAddressPem() : minerAddress;
+  rewardTxn->to = minerAddress.empty() ? wallet_.getAddress() : minerAddress;
   rewardTxn->amount = MINING_REWARD;
+  rewardTxn->senderPubKey = "";
   rewardTxn->signature = "COINBASE";
 
   std::vector<std::shared_ptr<Txn>> txns;
