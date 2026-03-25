@@ -8,6 +8,7 @@ class Txn {
 public:
   std::string id;
   std::string from;
+  std::string senderPubKey;
   std::string signature;
 
   virtual ~Txn() = default;

@@ -1,12 +1,55 @@
 #include "TxnPool.h"
+#include "models/CurrencyTxn.h"
 #include "osslWrapper.h"
 #include "utils/hex.h"
 
+#include <algorithm>
+#include <cctype>
+#include <exception>
 #include <memory>
-#include <openssl/bio.h>
-#include <openssl/ec.h>
-#include <openssl/pem.h>
 #include <vector>
+
+namespace {
+std::string normalizeAddress(std::string value) {
+  size_t start = 0;
+  while (start < value.size() &&
+         std::isspace(static_cast<unsigned char>(value[start])) != 0) {
+    ++start;
+  }
+
+  size_t end = value.size();
+  while (end > start &&
+         std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
+    --end;
+  }
+
+  std::string trimmed = value.substr(start, end - start);
+  if (trimmed.empty()) {
+    return {};
+  }
+
+  bool hadPrefix = false;
+  if (trimmed.size() >= 2 && trimmed[0] == '0' &&
+      (trimmed[1] == 'x' || trimmed[1] == 'X')) {
+    trimmed.erase(0, 2);
+    hadPrefix = true;
+  }
+
+  std::string lowered = trimmed;
+  std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+  const bool isHexBody =
+      !lowered.empty() &&
+      std::all_of(lowered.begin(), lowered.end(), [](unsigned char c) {
+        return std::isxdigit(c) != 0;
+      });
+  if (hadPrefix || (isHexBody && lowered.size() == 40)) {
+    return "0x" + lowered;
+  }
+  return trimmed;
+}
+} // namespace
 
 bool TxnPool::addTxn(std::shared_ptr<Txn> txn) {
   if (!txn)
@@ -25,24 +68,48 @@ bool TxnPool::verifyTxn(const std::shared_ptr<Txn> &txn) const {
     return false;
   if (pool_.find(txn->id) != pool_.end())
     return false;
+  return verifyTxnSignatureAndFormat(txn);
+}
+
+bool TxnPool::verifyTxnSignatureAndFormat(const std::shared_ptr<Txn> &txn) {
+  if (!txn)
+    return false;
+  if (txn->id.empty())
+    return false;
+
+  if (txn->from == "COINBASE") {
+    auto rewardTxn = std::dynamic_pointer_cast<CurrencyTxn>(txn);
+    if (!rewardTxn)
+      return false;
+    return !rewardTxn->to.empty() && rewardTxn->amount > 0.0;
+  }
+
   if (txn->signature.empty())
     return false;
   if (txn->from.empty())
     return false;
-
-  // reconstruct pubkey from PEM string
-  BIO *bio = BIO_new_mem_buf(txn->from.data(), txn->from.size());
-  if (!bio)
+  if (txn->senderPubKey.empty())
     return false;
 
-  EVP_PKEY *pubkey = PEM_read_bio_PUBKEY(bio, nullptr, nullptr, nullptr);
-  BIO_free(bio);
-
-  if (!pubkey)
+  EVP_PKEY *pubkey = OpenSSLWrapper::publicKeyFromRawHex(txn->senderPubKey);
+  if (!pubkey) {
     return false;
+  }
 
-  // convert hex signature back to raw bytes
-  std::vector<unsigned char> sigBytes = HexUtils::fromHex(txn->signature);
+  const std::string derivedAddress = OpenSSLWrapper::publicKeyToAddress(pubkey);
+  if (derivedAddress.empty() ||
+      normalizeAddress(derivedAddress) != normalizeAddress(txn->from)) {
+    EVP_PKEY_free(pubkey);
+    return false;
+  }
+
+  std::vector<unsigned char> sigBytes;
+  try {
+    sigBytes = HexUtils::fromHex(txn->signature);
+  } catch (const std::exception &) {
+    EVP_PKEY_free(pubkey);
+    return false;
+  }
   std::string data = txn->toSignableJson().dump();
 
   bool valid = OpenSSLWrapper::verify(pubkey, data, sigBytes);

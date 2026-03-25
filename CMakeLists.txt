@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Crow CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(UUID REQUIRED IMPORTED_TARGET uuid)
 
@@ -18,8 +19,11 @@ add_library(voidchain_core
     src/osslWrapper.cpp
     src/wallet.cpp
     src/TxnPool.cpp
+    src/miner.cpp
+    src/network/PeerClient.cpp
     src/utils/hashing.cpp
     src/core/TxnFactory.cpp
+    src/core/State.cpp
     src/models/CurrencyTxn.cpp
     src/models/AssetTxn.cpp
 )
@@ -30,11 +34,15 @@ target_link_libraries(voidchain_core PUBLIC
     Crow::Crow
     OpenSSL::SSL
     OpenSSL::Crypto
+    CURL::libcurl
     PkgConfig::UUID
 )
 
 add_executable(voidchain src/main.cpp)
 target_link_libraries(voidchain PRIVATE voidchain_core)
+
+add_executable(citizen_client scripts/citizen_client.cpp)
+target_link_libraries(citizen_client PRIVATE voidchain_core)
 
 option(BUILD_TESTING "Build Tests" ON)
 

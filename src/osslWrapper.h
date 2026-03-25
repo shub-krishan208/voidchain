@@ -19,4 +19,10 @@ public:
 
   static EVP_PKEY *extractPublicKey(const EVP_PKEY *keypair);
   static std::string publicKeyToPEM(EVP_PKEY *publicKey);
+  static std::vector<unsigned char> publicKeyToRawBytes(EVP_PKEY *publicKey);
+  static std::string publicKeyToRawHex(EVP_PKEY *publicKey);
+  static std::string publicKeyToAddress(EVP_PKEY *publicKey);
+  static EVP_PKEY *publicKeyFromRawHex(const std::string &publicHex);
+  static std::string privateKeyToHex(EVP_PKEY *keyPair);
+  static EVP_PKEY *keyPairFromPrivateHex(const std::string &privateHex);
 };

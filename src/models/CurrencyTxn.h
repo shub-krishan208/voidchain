@@ -7,6 +7,7 @@ struct CurrencyTxn : public Txn {
 
   nlohmann::json toJson() const override {
     auto j = toSignableJson();
+    j["senderPubKey"] = senderPubKey;
     j["signature"] = signature;
     return j;
   }
@@ -25,6 +26,7 @@ struct CurrencyTxn : public Txn {
     auto txn = std::make_shared<CurrencyTxn>();
     txn->id = j.at("id");
     txn->from = j.at("from");
+    txn->senderPubKey = j.value("senderPubKey", "");
     txn->to = j.at("to");
     txn->amount = j.at("amount");
     txn->signature = j.at("signature");

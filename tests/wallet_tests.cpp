@@ -12,7 +12,8 @@ TEST(WalletTest, WalletBasics) {
   EXPECT_NE(pub, nullptr);
 
   auto address = w.getAddress();
-  EXPECT_NE(address, nullptr);
+  EXPECT_FALSE(address.empty());
+  EXPECT_EQ(address.rfind("0x", 0), 0u);
 
   std::string data = "Test data for signing";
   std::vector<unsigned char> signature = w.sign(data);
@@ -31,7 +32,6 @@ TEST(WalletTest, WalletBasics) {
 TEST(WalletTest, SignCurrencyTxn) {
   Wallet w;
   CurrencyTxn txn;
-  txn.from = "alice";
   txn.to = "bob";
   txn.amount = 42.5;
 
@@ -43,6 +43,9 @@ TEST(WalletTest, SignCurrencyTxn) {
 
   // signature should be populated
   EXPECT_FALSE(txn.signature.empty());
+  EXPECT_FALSE(txn.from.empty());
+  EXPECT_EQ(txn.from, w.getAddress());
+  EXPECT_EQ(txn.senderPubKey, w.getPublicKeyHex());
 
   // verify the signature against the signable JSON
   auto sigBytes = HexUtils::fromHex(txn.signature);
@@ -57,7 +60,6 @@ TEST(WalletTest, SignCurrencyTxn) {
 TEST(WalletTest, SignAssetTxn) {
   Wallet w;
   AssetTxn txn;
-  txn.from = "alice";
   txn.to = "bob";
   txn.itemId = "item-001";
   txn.meta = "rare sword";
@@ -67,6 +69,9 @@ TEST(WalletTest, SignAssetTxn) {
   EXPECT_FALSE(txn.id.empty());
   EXPECT_EQ(txn.id.size(), 36u);
   EXPECT_FALSE(txn.signature.empty());
+  EXPECT_FALSE(txn.from.empty());
+  EXPECT_EQ(txn.from, w.getAddress());
+  EXPECT_EQ(txn.senderPubKey, w.getPublicKeyHex());
 
   auto sigBytes = HexUtils::fromHex(txn.signature);
   EVP_PKEY *pub = w.getPublicKey();
@@ -80,7 +85,6 @@ TEST(WalletTest, SignAssetTxn) {
 TEST(WalletTest, SignTxnRejectsAlreadySigned) {
   Wallet w;
   CurrencyTxn txn;
-  txn.from = "alice";
   txn.to = "bob";
   txn.amount = 10.0;
 
@@ -95,12 +99,10 @@ TEST(WalletTest, DifferentWalletsProduceDifferentSignatures) {
   Wallet w2;
 
   CurrencyTxn txn1;
-  txn1.from = "alice";
   txn1.to = "bob";
   txn1.amount = 5.0;
 
   CurrencyTxn txn2;
-  txn2.from = "alice";
   txn2.to = "bob";
   txn2.amount = 5.0;
 
@@ -127,4 +129,16 @@ TEST(WalletTest, DifferentWalletsProduceDifferentSignatures) {
 
   EVP_PKEY_free(pub1);
   EVP_PKEY_free(pub2);
+}
+
+TEST(WalletTest, SignTxnRejectsMismatchedSender) {
+  Wallet signer;
+  Wallet other;
+
+  CurrencyTxn txn;
+  txn.from = other.getAddress();
+  txn.to = "bob";
+  txn.amount = 12.0;
+
+  EXPECT_THROW(signer.signTxn(txn), std::runtime_error);
 }

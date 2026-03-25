@@ -14,22 +14,7 @@ makeSignedCurrencyTxn(Wallet &w, const std::string &to, double amount) {
   auto txn = std::make_shared<CurrencyTxn>();
   txn->to = to;
   txn->amount = amount;
-
-  // signTxn requires a Txn&, so dereference and then copy back via shared_ptr
   w.signTxn(*txn);
-
-  // after signing, `from` is still whatever we left it — the pool's verifyTxn
-  // needs `from` to hold the PEM public key so the signature can be checked.
-  EVP_PKEY *pub = w.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(pub);
-  EVP_PKEY_free(pub);
-
-  // re-sign because `from` changed after the first sign
-  // we need to clear signature first and resign with correct `from`
-  txn->signature.clear();
-  txn->id.clear();
-  w.signTxn(*txn);
-
   return txn;
 }
 
@@ -39,9 +24,6 @@ static std::shared_ptr<AssetTxn> makeSignedAssetTxn(Wallet &w,
                                                     const std::string &itemId,
                                                     const std::string &meta) {
   auto txn = std::make_shared<AssetTxn>();
-  EVP_PKEY *pub = w.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(pub);
-  EVP_PKEY_free(pub);
   txn->to = to;
   txn->itemId = itemId;
   txn->meta = meta;
@@ -119,9 +101,8 @@ TEST(TxnPoolTest, RejectTxnWithEmptySignature) {
   Wallet w;
 
   auto txn = std::make_shared<CurrencyTxn>();
-  EVP_PKEY *pub = w.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(pub);
-  EVP_PKEY_free(pub);
+  txn->from = w.getAddress();
+  txn->senderPubKey = w.getPublicKeyHex();
   txn->to = "bob";
   txn->amount = 10.0;
   txn->id = "test-id";
@@ -133,24 +114,56 @@ TEST(TxnPoolTest, RejectTxnWithEmptySignature) {
 
 TEST(TxnPoolTest, RejectTxnWithEmptyFrom) {
   TxnPool pool;
-  Wallet w;
+  Wallet w, recipient;
 
   auto txn = std::make_shared<CurrencyTxn>();
   txn->from = ""; // empty sender
-  txn->to = "bob";
+  txn->senderPubKey = w.getPublicKeyHex();
+  txn->to = recipient.getAddress();
   txn->amount = 10.0;
   txn->id = "test-id";
-  txn->signature = "deadbeef";
+  auto sigBytes = w.sign(txn->toSignableJson().dump());
+  txn->signature = HexUtils::toHex(sigBytes);
 
   EXPECT_FALSE(pool.addTxn(txn));
   EXPECT_EQ(pool.getTxn().size(), 0u);
 }
 
-TEST(TxnPoolTest, RejectTxnWithInvalidPEMKey) {
+TEST(TxnPoolTest, AcceptCoinbaseCurrencyTxnWithoutSignature) {
+  TxnPool pool;
+
+  auto reward = std::make_shared<CurrencyTxn>();
+  reward->id = "coinbase-001";
+  reward->from = "COINBASE";
+  reward->to = "miner-address";
+  reward->amount = 50.0;
+  reward->senderPubKey = "";
+  reward->signature = "";
+
+  EXPECT_TRUE(pool.addTxn(reward));
+  EXPECT_EQ(pool.getTxn().size(), 1u);
+}
+
+TEST(TxnPoolTest, RejectCoinbaseIfNotCurrencyTxn) {
+  TxnPool pool;
+
+  auto invalidReward = std::make_shared<AssetTxn>();
+  invalidReward->id = "coinbase-asset";
+  invalidReward->from = "COINBASE";
+  invalidReward->to = "miner-address";
+  invalidReward->itemId = "item-1";
+  invalidReward->meta = "invalid";
+
+  EXPECT_FALSE(pool.addTxn(invalidReward));
+  EXPECT_EQ(pool.getTxn().size(), 0u);
+}
+
+TEST(TxnPoolTest, RejectTxnWithInvalidSenderPublicKey) {
   TxnPool pool;
 
   auto txn = std::make_shared<CurrencyTxn>();
-  txn->from = "not-a-valid-pem-key";
+  txn->from = "0x1111111111111111111111111111111111111111";
+  txn->senderPubKey = "not-a-valid-public-key";
   txn->to = "bob";
   txn->amount = 10.0;
   txn->id = "test-id";
@@ -175,16 +188,16 @@ TEST(TxnPoolTest, RejectTxnSignedByDifferentWallet) {
   TxnPool pool;
   Wallet signer, impersonator;
 
-  // sign with `signer` wallet but use `impersonator`'s public key as `from`
+  // sign bytes with one wallet but claim another wallet's public key as sender
   auto txn = std::make_shared<CurrencyTxn>();
-  EVP_PKEY *impPub = impersonator.getPublicKey();
-  txn->from = OpenSSLWrapper::publicKeyToPEM(impPub);
-  EVP_PKEY_free(impPub);
+  txn->id = "forged-id";
+  txn->from = impersonator.getAddress();
+  txn->senderPubKey = impersonator.getPublicKeyHex();
   txn->to = "bob";
   txn->amount = 100.0;
 
-  // sign with the wrong wallet
-  signer.signTxn(*txn);
+  auto forgedSig = signer.sign(txn->toSignableJson().dump());
+  txn->signature = HexUtils::toHex(forgedSig);
 
   EXPECT_FALSE(pool.addTxn(txn));
   EXPECT_EQ(pool.getTxn().size(), 0u);
@@ -425,16 +438,47 @@ TEST(TxnPoolTest, RejectedTxnDoesNotPollutePool) {
   EXPECT_FALSE(pool.addTxn(nullptr));
 
   auto noSig = std::make_shared<CurrencyTxn>();
-  noSig->from = "x";
-  noSig->to = "y";
+  noSig->from = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  noSig->senderPubKey = "04";
+  noSig->to = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
   noSig->amount = 1.0;
   EXPECT_FALSE(pool.addTxn(noSig));
 
   auto noFrom = std::make_shared<CurrencyTxn>();
-  noFrom->signature = "aa";
-  noFrom->to = "y";
+  noFrom->id = "no-from";
+  noFrom->senderPubKey = w.getPublicKeyHex();
+  noFrom->to = "0xcccccccccccccccccccccccccccccccccccccccc";
   noFrom->amount = 1.0;
+  auto noFromSig = w.sign(noFrom->toSignableJson().dump());
+  noFrom->signature = HexUtils::toHex(noFromSig);
   EXPECT_FALSE(pool.addTxn(noFrom));
+
+  auto malformedSig = std::make_shared<CurrencyTxn>();
+  malformedSig->id = "bad-sig";
+  malformedSig->from = w.getAddress();
+  malformedSig->senderPubKey = w.getPublicKeyHex();
+  malformedSig->to = "0xdddddddddddddddddddddddddddddddddddddddd";
+  malformedSig->amount = 1.0;
+  malformedSig->signature = "aa";
+  EXPECT_FALSE(pool.addTxn(malformedSig));
+
+  auto invalidHexSig = std::make_shared<CurrencyTxn>();
+  invalidHexSig->id = "invalid-hex";
+  invalidHexSig->from = w.getAddress();
+  invalidHexSig->senderPubKey = w.getPublicKeyHex();
+  invalidHexSig->to = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  invalidHexSig->amount = 1.0;
+  invalidHexSig->signature = "zz";
+  EXPECT_FALSE(pool.addTxn(invalidHexSig));
+
+  auto noFromInvalid = std::make_shared<CurrencyTxn>();
+  noFromInvalid->from = "";
+  noFromInvalid->to = "y";
+  noFromInvalid->amount = 1.0;
+  noFromInvalid->id = "no-from-invalid";
+  noFromInvalid->senderPubKey = w.getPublicKeyHex();
+  noFromInvalid->signature = "aa";
+  EXPECT_FALSE(pool.addTxn(noFromInvalid));
 
   // pool should still contain only the one valid txn
   EXPECT_EQ(pool.getTxn().size(), 1u);

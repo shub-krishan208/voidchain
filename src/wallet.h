@@ -11,7 +11,8 @@ public:
   ~Wallet();
 
   EVP_PKEY *getPublicKey() const;
-  EVP_PKEY *getAddress() const;
+  std::string getAddress() const;
+  std::string getPublicKeyHex() const;
   std::vector<unsigned char> sign(const std::string &data) const;
   void signTxn(Txn &txn) const;
 

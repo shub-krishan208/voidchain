@@ -2,10 +2,10 @@
 #define VOID_CHAIN_H
 
 #include "./utils/hashing.h"
-#include "models/Txn.h"
 #include "block.h"
-#include <vector>
+#include "models/Txn.h"
 #include <mutex>
+#include <vector>
 class Blockchain {
 public:
   Blockchain();
@@ -13,8 +13,14 @@ public:
 
   // create the block and add to the chain. (mining logic implemented later)
   const std::vector<Block> &getChain() const { return chain; };
-  void addBlock(const std::vector<std::shared_ptr<Txn>> txns);
+  Block addBlock(const std::vector<std::shared_ptr<Txn>> txns);
+  bool addBlock(const Block &block);
   const Block &getLatestBlock(); // outputs the block at the last of the chain
+  static bool findTransactionInChain(const std::vector<Block> &sourceChain,
+                                     const std::string &txId,
+                                     size_t &outBlockIndex,
+                                     std::shared_ptr<Txn> &outTxn);
+  static bool isValidBlock(const Block &block, const Block &previousBlock);
   static bool isValidBlockchain(const std::vector<Block> &newchain);
   bool replaceBlockchain(const std::vector<Block> &newBlockchain);
 
